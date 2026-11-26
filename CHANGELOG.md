@@ -46,3 +46,10 @@
   sama koristuse varuks kaks korda nädalas.
 - Õpilase leht ütleb tähtaja välja; ajalugu näitab iga tunni kustumise kuupäeva.
 - Rühmade nimekirjad ja telefonide sidumised jäävad alles, kuni õpetaja rühma kustutab.
+
+### Vastavuse kontroll (hiljem samal päeval)
+- Kontrollitud kooli kordade, ÕKE ja Andmekaitse Inspektsiooni juhiste vastu. Sisuliselt on lahendus kooskõlas
+  (päevik jääb Tahvlisse, õpetaja salvestab ise, andmed krüpteeritud ja EL-is), kuid kasutuselevõtt vajab kooli
+  heakskiitu. README-sse lisatud jaotis „Enne kasutuselevõttu koolis“.
+- Lahendatud: säilitustähtaeg (vt eelmine jaotis).
+- Lahti: kooli heakskiit, leping teenusepakkujaga, õpilaste teavitustekst.

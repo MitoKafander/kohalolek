@@ -62,6 +62,9 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
 
 ## Järgmised sammud
 
+0. **Enne päris õpilastega kasutamist peab kool rakenduse heaks kiitma** (vt README „Enne kasutuselevõttu koolis“;
+   kontrolli tulemus ja allikad on töökeskkonna mälus). Tehniliselt lahendamata sellest: õpilastele mõeldud
+   teavitustekst õpilase lehel (praegu üks lause jaluses).
 1. Esimese päris tunni tagasiside ja sellest tulenevad parandused.
 2. Kasutajalt vastuseta: kas tuua siia perioodi kokkuvõte rühmajuhendajale (Tunnimärkmetes oli) ja kas teha
    tunniplaanist eeltäitmine ka teise õpetaja tundidele (praegu ainult ühe õpetaja tunniplaan).
@@ -71,8 +74,8 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
 
 ## Komistuskivid
 
-- **`koh_session_state` ja `koh_ws_login`** on mitmes migratsioonis uuesti defineeritud. Kehtib kõige uuema
-  migratsiooni variant; muutes kopeeri sealt.
+- **`koh_session_state`, `koh_ws_login` ja `koh_checkin`** on mitmes migratsioonis uuesti defineeritud. Kehtib
+  kõige uuema migratsiooni variant (praegu: `…_notes.sql` ja `…_retention.sql`); muutes kopeeri sealt.
 - **Vahetuv kood:** 10 s aken ja sama arvutus peab klappima SQL-is (`kohalolek.token`) ja JS-is (`KOH.token`).
 - **Tööruumi nime teisendus** (`normCode`) peab olema loomisel ja sisselogimisel sama, sest nimi on võtme sool.
   Parool ei ole taastatav.

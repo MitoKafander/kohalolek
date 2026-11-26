@@ -56,6 +56,15 @@ ainult ühe). Tüüpe ja lauseid saab muuta rühmade lehel („Märkuste ja kiit
   Ametlik kirje on Tahvlis; siin on ainult tööks vajalik koopia.
 - Tahvlisse liiguvad andmed õpetaja lõikelaua kaudu. Skript Tahvlis midagi ise ei salvesta.
 
+## Enne kasutuselevõttu koolis
+
+See on tööriist, mitte kooli infosüsteem. Andmekaitse Inspektsiooni 2026. a ringkiri koolidele ütleb, et kasutada
+tuleb rakendusi, mille haridusasutus on hinnanud ja heaks kiitnud, ning inspektsiooni 2024. a ettekanne, et
+keskkondade valiku otsustab kool, mitte iga õpetaja eraldi. Enne päris õpilastega kasutamist tuleb seega koolis
+kokku leppida vähemalt: kes rakenduse heaks kiidab, leping teenusepakkujaga (andmebaas on Supabase'is, leht
+GitHub Pages'is, mis logib külastaja IP-aadressi), kuidas õpilasi teavitatakse ja kui kaua andmeid hoitakse.
+Krüpteeritud andmed on endiselt isikuandmed.
+
 ## Petmise vastu
 
 Kood kehtib kuni 30 sekundit ja iga telefon on seotud ühe nimega, nii et sõbrale saadetud pilt ei

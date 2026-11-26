@@ -172,8 +172,11 @@ await T.click('button[data-act=home]'); await T.waitForSelector('button[data-act
 await T.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg'));
 await T2.click('button[data-act=home]'); await T2.waitForSelector('button[data-act=resume]'); await T2.click('button[data-act=resume]');
 await T2.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg'));
-await T.fill('#mN', '3'); await T.dispatchEvent('#mN', 'change'); await T.selectOption('#mType', 'Praktiline töö');
-await T2.waitForFunction(() => document.getElementById('mN').value === '3' && document.getElementById('mType').value === 'Praktiline töö', null, { timeout: 9000 });
+await T2.check('input[data-cap="Iseseisev õpe"]'); await T2.focus('#mNr');   // teises seadmes on päises väli valitud
+await T.waitForTimeout(700);                                                  // inimese tempo: kaks seadet ei salvesta samal sekundimurdosal
+await T.fill('#mN', '5'); await T.dispatchEvent('#mN', 'change'); await T.selectOption('#mType', 'Praktiline töö');
+await T.waitForFunction(() => document.querySelector('input[data-cap="Iseseisev õpe"]').checked, null, { timeout: 9000 });
+await T2.waitForFunction(() => document.getElementById('mN').value === '5' && document.getElementById('mType').value === 'Praktiline töö', null, { timeout: 9000 });
 ok(true, 'lesson details changed on one device appear on the other');
 await T.click('button[data-act=end]'); await T.click('button[data-act=end]');
 await T.waitForSelector('button[data-act=copy-tahvel]', { timeout: 8000 });

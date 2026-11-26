@@ -18,7 +18,12 @@ const tctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, 
 const T = await tctx.newPage(); watch(T, 'teacher');
 await T.goto(base + '/opetaja/');
 await T.click('button[data-tab=create]');
-await T.fill('#lCode', 'proov'); await T.fill('#lPw', 'salajane-parool-1'); await T.fill('#lPw2', 'salajane-parool-1'); await T.fill('#lInv', 'kutse-test'); await T.fill('#lTeacher', 'Proovija');
+await T.fill('#lCode', 'Õpetaja Proov'); await T.fill('#lPw', 'salajane-parool-1'); await T.fill('#lPw2', 'teine-parool-12'); await T.fill('#lInv', 'kutse-test'); await T.fill('#lTeacher', 'Proovija');
+await T.click('button[type=submit]');
+await T.waitForSelector('#lMsg .banner.crit');
+ok(await T.inputValue('#lInv') === 'kutse-test' && await T.inputValue('#lPw') === 'salajane-parool-1' && await T.inputValue('#lTeacher') === 'Proovija', 'validation error keeps the other fields');
+ok(await T.inputValue('#lCode') === 'opetaja-proov', 'name with space, capitals and õ is normalised: ' + await T.inputValue('#lCode'));
+await T.fill('#lPw2', 'salajane-parool-1');
 await T.click('button[type=submit]');
 await T.waitForSelector('button[data-act=new-group]', { timeout: 20000 });
 ok(true, 'workspace created + logged in');
@@ -125,9 +130,9 @@ ok((await T.textContent('.card .small')).includes('2 telefoni seotud'), 'home sh
 await T.click('button[data-act=history]'); await T.waitForSelector('button.st[data-act=resume]');
 ok((await T.textContent('button.st[data-act=resume]')).includes('Proovija'), 'history lists the session with teacher name');
 const t2 = await browser.newContext({ viewport: { width: 1100, height: 800 } }); const T2 = await t2.newPage(); watch(T2, 'teacher2');
-await T2.goto(base + '/opetaja/'); await T2.fill('#lCode', 'proov'); await T2.fill('#lPw', 'vale-parool-123'); await T2.click('button[type=submit]');
-await T2.waitForSelector('.banner.crit'); ok(true, 'wrong password rejected');
-await T2.fill('#lCode', 'proov'); await T2.fill('#lPw', 'salajane-parool-1'); await T2.click('button[type=submit]');
+await T2.goto(base + '/opetaja/'); await T2.fill('#lCode', 'Õpetaja  proov'); await T2.fill('#lPw', 'vale-parool-123'); await T2.click('button[type=submit]');
+await T2.waitForSelector('.banner.crit'); ok(await T2.inputValue('#lCode') === 'opetaja-proov', 'wrong password rejected, name kept');
+await T2.fill('#lPw', 'salajane-parool-1'); await T2.click('button[type=submit]');
 await T2.waitForSelector('button[data-act=edit-group]', { timeout: 20000 });
 await T2.click('button[data-act=edit-group]');
 ok((await T2.inputValue('#gNames')).includes('Näidis Diana'), 'second device decrypts roster after login');

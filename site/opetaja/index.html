@@ -245,13 +245,13 @@ function vLogin() {
   return `<h1>Kohalolek</h1>
   <div class="tabs"><button data-act="tab" data-tab="login" aria-current="${!create}">Logi sisse</button><button data-act="tab" data-tab="create" aria-current="${create}">Loo tööruum</button></div>
   <form class="card" id="loginForm">
-    <label class="f">Tööruumi nimi<input type="text" id="lCode" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+    <label class="f">Tööruumi nimi${create ? ' (nt mikk-rosin; tühikud muutuvad sidekriipsuks)' : ''}<input type="text" id="lCode" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
     <label class="f">Parool<input type="password" id="lPw" autocomplete="${create ? 'new-password' : 'current-password'}" required></label>
     ${create ? `<label class="f">Parool uuesti<input type="password" id="lPw2" autocomplete="new-password" required></label>
     <label class="f">Kutsekood<input type="text" id="lInv" autocapitalize="none" spellcheck="false" required></label>` : ''}
     <label class="f">Sinu nimi (näha tunni ajaloos)<input type="text" id="lTeacher" maxlength="40" value="${esc((loadAuth() || {}).teacher || '')}"></label>
     <label class="chk"><input type="checkbox" id="lRemember" checked> Jäta see seade meelde</label>
-    ${ui.msg ? `<div class="banner crit">${esc(ui.msg)}</div>` : ''}
+    <div id="lMsg">${ui.msg ? `<div class="banner crit">${esc(ui.msg)}</div>` : ''}</div>
     <div class="row"><button class="btn primary" type="submit">${create ? 'Loo tööruum' : 'Logi sisse'}</button></div>
     <p class="small muted" style="margin:0">${create ? 'Parooli ei saa taastada: sellest tehakse võti, millega õpilaste nimed sinu seadmes krüpteeritakse. Kui parool kaob, tuleb rühmad uuesti sisestada. Kolleegiga ühiseks kasutamiseks jaga talle tööruumi nime ja parooli.' : 'Jagatud arvutis võta linnuke „Jäta see seade meelde“ ära ja logi lõpuks välja.'}</p>
   </form>`;
@@ -359,18 +359,24 @@ async function goHome() { stopTimers(); SS = null; V = { view: 'home' }; try { a
 async function act(fn, args) { const r = await rpc(fn, { ...cred(), ...args }); await poll(); return r; }
 
 /* ---------- sündmused ---------- */
+/* „Mikk Rosin“ → „mikk-rosin“: sama teisendus loomisel ja sisselogimisel, nii et mõlemad kirjapildid töötavad. */
+const normCode = v => v.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
 document.addEventListener('submit', async ev => {
   if (ev.target.id !== 'loginForm') return;
   ev.preventDefault();
   const v = id => (document.getElementById(id) || {}).value || '';
-  const code = v('lCode').trim().toLowerCase(), pw = v('lPw'), create = ui.tab === 'create', teacher = v('lTeacher').trim();
+  const create = ui.tab === 'create', pw = v('lPw'), teacher = v('lTeacher').trim(), code = normCode(v('lCode'));
   const remember = document.getElementById('lRemember').checked;
-  const fail = m => { ui.msg = m; render(); document.getElementById('lCode').value = code; };
-  if (!/^[a-z0-9][a-z0-9_-]{2,31}$/.test(code)) return fail('Tööruumi nimi: 3–32 märki, väiketähed, numbrid, - ja _.');
+  const btn = ev.target.querySelector('button[type=submit]'), btnText = create ? 'Loo tööruum' : 'Logi sisse';
+  /* Viga näidatakse vormi sees: sisestatud väljad jäävad alles. */
+  const fail = m => { ui.msg = m; document.getElementById('lMsg').innerHTML = `<div class="banner crit">${esc(m)}</div>`; btn.disabled = false; btn.textContent = btnText; };
+  if (!/^[a-z0-9][a-z0-9_-]{2,31}$/.test(code)) return fail('Tööruumi nimi peab olema 3–32 märki: tähed, numbrid, - ja _.');
+  document.getElementById('lCode').value = code;
   if (create && pw.length < 10) return fail('Parool peab olema vähemalt 10 märki.');
   if (create && pw !== v('lPw2')) return fail('Paroolid ei kattu.');
+  if (!pw) return fail('Sisesta parool.');
   const inv = v('lInv').trim();
-  const btn = ev.target.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Arvutan võtit…';
+  btn.disabled = true; btn.textContent = 'Arvutan võtit…';
   try {
     const k = await KOH.deriveKeys(code, pw);
     if (create) {

@@ -102,7 +102,7 @@ let SS = null;           // käimasoleva/avatud tunni seis serverist
 let offset = 0;          // serveri kell miinus selle seadme kell
 let timers = [];
 let lastQrKey = '';
-const ui = { tab: 'login', msg: '', openSlot: null, hide: false, busy: false, net: true };
+const ui = { tab: 'login', msg: '', openSlot: null, hide: false, net: true, frame: '' };
 try { ui.hide = localStorage.getItem('koh-hide') === '1'; } catch (e) {}
 
 /* ---------- abid ---------- */
@@ -139,6 +139,44 @@ function bellTimes(g, dayTs) {
 }
 /* Mitmes tund kell `ts` käib või kohe algab (kuni 10 min enne kella loetakse juba järgmiseks). */
 function guessNr(g, ts) { let k = 0; bellTimes(g, ts).forEach((b, i) => { if (b <= ts + 10 * 60000) k = i; }); return k + 1; }
+/* Algustunni ja tundide arvu eeltäitmine tunniplaanist (valikuline). Sama aadressi all olev tunniplaani leht
+ * avaldab EduPage'ist loetud tunnid (plokid: päev, algus, lõpp, rühm, „7–8“). Kui selle rühma tund praegu käib
+ * või algab kuni 15 min pärast, võetakse sealt algustund ja tundide arv. Kui andmeid pole, jääb vaikimisi pakkumine. */
+const TT_URL = new URL('../../tunniplaan/data/snap.json', location.href).href;
+async function timetableHint(g, ts) {
+  try {
+    const r = await fetch(TT_URL, { cache: 'no-cache' }); if (!r.ok) return null;
+    const c = (await r.json())[campusOf(g) === 'M' ? 'mustamae' : 'kesklinn']; if (!c) return null;
+    const iso = x => x.getFullYear() + '-' + pad(x.getMonth() + 1) + '-' + pad(x.getDate());
+    const mondayOf = x => { const y = new Date(x); y.setHours(12, 0, 0, 0); y.setDate(y.getDate() - (y.getDay() + 6) % 7); return y; };
+    // EduPage'i alguskuupäev võib olla vananenud; nädala tegelik vahemik on versiooni nimes (nagu tunniplaani lehel)
+    const versionMonday = v => {
+      const m = String(v.name || '').match(/(\d{2})\.(\d{2})-\d{2}\.\d{2}\.(\d{2})/);
+      if (m) return iso(mondayOf(new Date(2000 + +m[3], +m[2] - 1, +m[1])));
+      if (!v.from) return null;
+      const d = new Date(v.from + 'T12:00:00'); if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+      return iso(mondayOf(d));
+    };
+    const d = new Date(ts), mon = iso(mondayOf(d)), day = (d.getDay() + 6) % 7, nowMin = d.getHours() * 60 + d.getMinutes();
+    const tagged = (c.versions || []).filter(v => !v.hidden).map(v => ({ v, monday: versionMonday(v) })).filter(x => x.monday);
+    let ver = tagged.filter(x => x.monday === mon).pop();
+    if (!ver) {   // selle nädala versiooni pole: kasuta viimast varasemat ainult siis, kui hilisemat ei ole
+      if (tagged.some(x => x.monday > mon)) return null;
+      ver = tagged.filter(x => x.monday < mon).sort((a, b) => a.monday < b.monday ? -1 : 1).pop();
+      if (!ver) return null;
+    }
+    const mins = t => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
+    const mine = b => String(b.group || '').toUpperCase().split(/[\s,;/]+/).includes(g.label.trim().toUpperCase());
+    const cur = (ver.v.blocks || []).find(b => b.day === day && mine(b) && mins(b.start) - 15 <= nowMin && nowMin < mins(b.end));
+    if (!cur) return null;
+    const m = String(cur.lessons || '').match(/^(\d+)(?:\D+(\d+))?$/);
+    let p0, p1;
+    if (m) { p0 = +m[1]; p1 = +(m[2] || m[1]); }
+    else { const bl = ver.v.bells || []; p0 = bl.findIndex(x => x.start === cur.start) + 1; p1 = bl.findIndex(x => x.end === cur.end) + 1; }
+    if (!(p0 >= 1 && p1 >= p0)) return null;
+    return { nr: p0, n: p1 - p0 + 1, tt: `${cur.subject || 'tund'}, ${p0 === p1 ? p0 + '. tund' : 'tunnid ' + p0 + '–' + p1}` };
+  } catch (e) { return null; }
+}
 const groupDefaults = gid => { try { return JSON.parse(localStorage.getItem('koh-def-' + gid) || '{}'); } catch (e) { return {}; } };
 const cleanName = n => n.replace(/^\s*\d+[.)]\s*/, '').replace(/\s+/g, ' ').trim();
 
@@ -206,14 +244,39 @@ async function importGroups(list) {
 }
 
 /* ---------- tunni seis ---------- */
-async function poll() {
-  if (ui.busy) return; ui.busy = true;
+/* Seisupäringud käivad järjekorras. Nupuvajutuse järel tehtav päring ei jää vahele ka siis, kui taustapäring parajasti käib
+ * (varem jäi: „Lõpeta tund“ järel võis vaade jääda vana seisu peale). */
+let pollChain = Promise.resolve(), pollQueued = 0;
+function poll() {
+  pollQueued++;
+  pollChain = pollChain.then(doPoll, doPoll).finally(() => { pollQueued--; });
+  return pollChain;
+}
+async function doPoll() {
+  if (V.view !== 'session') return;
+  const id = V.id;
   try {
-    const r = await rpc('koh_session_state', { ...cred(), p_session: V.id });
+    const r = await rpc('koh_session_state', { ...cred(), p_session: id });
     ui.net = true;
+    if (V.view !== 'session' || V.id !== id) return;      // vahepeal lahkuti sellest tunnist
     if (r.ok) { offset = r.now - Date.now(); SS = r; } else if (r.err === 'auth') { logout(); }
   } catch (e) { ui.net = false; }
-  ui.busy = false;
+}
+/* Mille järgi on tunni vaate raam joonistatud. Kui see muutub (tund lõpetati, uus kontroll või lisaandmed
+ * muudeti teises seadmes), joonistatakse raam uuesti. */
+function frameKey() {
+  if (!SS) return '';
+  const M = metaOf();
+  return [SS.session.ended_at ? 1 : 0, SS.session.round, M.nr, M.n, M.type, M.cap.join(',')].join('|');
+}
+function syncFrame() {
+  if (V.view !== 'session' || !SS) return;
+  const k = frameKey();
+  if (k === ui.frame) { updateSession(); return; }
+  const core = x => x.split('|').slice(0, 2).join('|'), ae = document.activeElement;
+  // ainult lisaandmed muutusid ja kasutaja on parajasti päise väljal: ära võta fookust ära
+  if (core(k) === core(ui.frame || '') && ae && /^(INPUT|SELECT)$/.test(ae.tagName) && ae.id !== 'hideNames') { updateSession(); return; }
+  render(); lastQrKey = ''; updateQr();
 }
 /* Iga õpilase staatus: käsitsi parandus või skaneerimise aja järgi. */
 /* Tunni lisaandmed: algustund, tundide arv, Tahvli kande liik ja maht. Server hoiab, kohalik koopia on varuks. */
@@ -223,11 +286,11 @@ function metaOf() {
   const m = Object.assign({}, local, s.meta || {});
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   return { nr: clamp(+m.nr || guessNr(g, s.start_at), 1, BELLS.K.length), n: clamp(+m.n || +d.n || 2, 1, 12),
-    type: typeof m.type === 'string' ? m.type : (d.type || ''), cap: Array.isArray(m.cap) ? m.cap : (d.cap || []) };
+    type: typeof m.type === 'string' ? m.type : (d.type || ''), cap: Array.isArray(m.cap) ? m.cap : (d.cap || []), tt: typeof m.tt === 'string' ? m.tt.slice(0, 120) : '' };
 }
 async function saveMeta(patch) {
   const s = SS.session, m = { ...metaOf(), ...patch };
-  s.meta = m;
+  s.meta = m; ui.frame = frameKey();
   try { localStorage.setItem('koh-meta-' + s.id, JSON.stringify(m)); localStorage.setItem('koh-def-' + s.group_id, JSON.stringify({ n: m.n, type: m.type, cap: m.cap })); } catch (e) {}
   try { await rpc('koh_session_meta', { ...cred(), p_session: s.id, p_meta: m }); } catch (e) { /* vanem server: jääb kohalikuks */ }
 }
@@ -262,7 +325,7 @@ function calcPer(refs, on, scans, rounds) {
   });
   return { per, missed };
 }
-window.__kohCalc = { calcPer, LATE_MS, LESSON_MS };
+window.__kohCalc = { calcPer, timetableHint, LATE_MS, LESSON_MS };
 /* Iga õpilase staatus: käsitsi parandus või skaneerimiste järgi. st: K, H, P, O (osaliselt), W (ootel). */
 function statuses() {
   const s = SS.session, g = group(s.group_id), ended = !!s.ended_at, t = now();
@@ -304,7 +367,7 @@ function render() {
   const fn = { login: vLogin, home: vHome, group: vGroup, history: vHistory, session: vSession }[V.view] || vLogin;
   app.className = 'wrap' + (V.view === 'session' ? '' : ' narrow');
   app.innerHTML = fn();
-  if (V.view === 'session') updateSession();
+  if (V.view === 'session') { ui.frame = frameKey(); updateSession(); }
 }
 function vLogin() {
   const create = ui.tab === 'create';
@@ -369,6 +432,7 @@ function vSession() {
   <div class="row small muted">Tahvli kanne:
     <select id="mType"><option value="">liik valimata</option>${ENTRY_TYPES.map(x => `<option${M.type === x ? ' selected' : ''}>${x}</option>`).join('')}</select>
     ${CAPS.map(x => `<label class="chk"><input type="checkbox" data-cap="${x}"${M.cap.includes(x) ? ' checked' : ''}> ${x.toLowerCase()}</label>`).join('')}
+    <span id="ttNote">${M.tt ? '· tunniplaanist: ' + esc(M.tt) : ''}</span>
   </div>
   <div id="net"></div>
   <div class="split">
@@ -428,7 +492,7 @@ async function openSession(id) {
   if (!SS) { V = { view: 'home' }; ui.msg = 'Tundi ei saanud avada.'; render(); return; }
   render(); updateQr();
   timers.push(setInterval(updateQr, 500));
-  timers.push(setInterval(async () => { if (SS && SS.session.ended_at) { updateSession(); return; } await poll(); updateSession(); }, 2500));
+  timers.push(setInterval(async () => { if (pollQueued || (SS && SS.session.ended_at)) return; await poll(); syncFrame(); }, 2500));
 }
 async function goHome() { stopTimers(); SS = null; V = { view: 'home' }; try { await refresh(); } catch (e) {} if (A) render(); }
 async function act(fn, args) { const r = await rpc(fn, { ...cred(), ...args }); await poll(); return r; }
@@ -485,11 +549,12 @@ document.addEventListener('click', async ev => {
     else if (a === 'start') {
       b.disabled = true;
       let ontime = 5; try { ontime = +(localStorage.getItem('koh-ontime') || 5); } catch (e) {}
-      const g = group(b.dataset.id), t0 = now(), nr = guessNr(g, t0), bell = bellTimes(g, t0)[nr - 1], d = groupDefaults(g.id);
+      const g = group(b.dataset.id), t0 = now(), d = groupDefaults(g.id), hint = await timetableHint(g, t0);
+      const nr = hint ? hint.nr : guessNr(g, t0), bell = bellTimes(g, t0)[nr - 1] || t0;
       const startAt = bell > t0 ? bell : t0;   // enne kella alustades loetakse hilinemist kellast
       const r = await rpc('koh_session_start', { ...cred(), p_group: g.id, p_start_at: new Date(startAt).toISOString(), p_ontime: ontime, p_teacher: A.teacher || null });
       if (!r.ok) { ui.msg = 'Tundi ei saanud alustada.'; render(); return; }
-      const m = { nr, n: +d.n || 2, type: d.type || '', cap: d.cap || [] };
+      const m = { nr, n: hint ? hint.n : (+d.n || 2), type: d.type || '', cap: d.cap || [], tt: hint ? hint.tt : '' };
       try { localStorage.setItem('koh-meta-' + r.id, JSON.stringify(m)); } catch (e) {}
       try { await rpc('koh_session_meta', { ...cred(), p_session: r.id, p_meta: m }); } catch (e) {}
       await openSession(r.id);
@@ -526,12 +591,12 @@ document.addEventListener('change', async ev => {
     }
     else if (t.id === 'mNr' && SS) {
       const nr = +t.value, bell = bellTimes(group(SS.session.group_id), SS.session.start_at)[nr - 1];
-      await saveMeta({ nr });
+      await saveMeta({ nr, tt: '' });
       await act('koh_session_update', { p_session: V.id, p_start_at: new Date(bell).toISOString(), p_ontime: null });
       const sa = document.getElementById('startAt'); if (sa) sa.value = hm(bell);
       updateSession();
     }
-    else if (t.id === 'mN' && SS) { await saveMeta({ n: Math.min(12, Math.max(1, +t.value || 1)) }); updateSession(); }
+    else if (t.id === 'mN' && SS) { await saveMeta({ n: Math.min(12, Math.max(1, +t.value || 1)), tt: '' }); const h = document.getElementById('ttNote'); if (h) h.textContent = ''; updateSession(); }
     else if (t.id === 'mType' && SS) { await saveMeta({ type: t.value }); }
     else if (t.dataset && t.dataset.cap && SS) { await saveMeta({ cap: [...document.querySelectorAll('input[data-cap]:checked')].map(x => x.dataset.cap) }); }
     else if (t.id === 'impFile') {

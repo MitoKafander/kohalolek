@@ -42,7 +42,7 @@ await T.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg
 const url = () => T.evaluate(() => window.__kohUrl);
 ok((await url()).startsWith(base + '/#'), 'QR url points at student page: ' + (await url()).length + ' chars');
 ok((await T.textContent('#count')).trim() === 'Kohal 0 / 4', 'count 0/4');
-ok(await T.inputValue('#mN') === '2' && /^\d+$/.test(await T.inputValue('#mNr')), 'defaults: 2 lessons, start lesson guessed from the clock');
+ok(await T.inputValue('#mN') === '3' && /^\d+$/.test(await T.inputValue('#mNr')) && (await T.textContent('#ttNote')).includes('Proovitund'), 'lesson count and start lesson prefilled from the timetable: n=' + await T.inputValue('#mN') + ' ' + (await T.textContent('#ttNote')).trim());
 await T.fill('#mN', '1'); await T.dispatchEvent('#mN', 'change');
 await T.selectOption('#mType', 'Tund'); await T.check('input[data-cap="Auditoorne õpe"]');
 
@@ -167,6 +167,27 @@ await T2.fill('#lPw', 'salajane-parool-1'); await T2.click('button[type=submit]'
 await T2.waitForSelector('button[data-act=edit-group]', { timeout: 20000 });
 await T2.click('button[data-act=edit-group]');
 ok((await T2.inputValue('#gNames')).includes('Näidis Diana'), 'second device decrypts roster after login');
+// kaks õpetaja seadet samas tunnis: teises seadmes tehtud muudatused jõuavad esimesse
+await T.click('button[data-act=home]'); await T.waitForSelector('button[data-act=start]'); await T.click('button[data-act=start]');
+await T.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg'));
+await T2.click('button[data-act=home]'); await T2.waitForSelector('button[data-act=resume]'); await T2.click('button[data-act=resume]');
+await T2.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg'));
+await T.fill('#mN', '3'); await T.dispatchEvent('#mN', 'change'); await T.selectOption('#mType', 'Praktiline töö');
+await T2.waitForFunction(() => document.getElementById('mN').value === '3' && document.getElementById('mType').value === 'Praktiline töö', null, { timeout: 9000 });
+ok(true, 'lesson details changed on one device appear on the other');
+await T.click('button[data-act=end]'); await T.click('button[data-act=end]');
+await T.waitForSelector('button[data-act=copy-tahvel]', { timeout: 8000 });
+ok(true, 'ending shows the summary on the device that ended it');
+await T2.waitForSelector('button[data-act=copy-tahvel]', { timeout: 9000 });
+ok(!(await T2.$('#qr svg')), 'ending on one device switches the other device to the summary');
+// lõpetamine täpselt taustapäringu ajal (varem jäi vaade vana seisu peale): 5 korda järjest
+for (let i = 0; i < 5; i++) {
+  await T.click('button[data-act=reopen]'); await T.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg') && document.querySelector('button[data-act=end]'));
+  await T.waitForTimeout(2440 - i * 30);
+  await T.click('button[data-act=end]'); await T.click('button[data-act=end]');
+  await T.waitForSelector('button[data-act=copy-tahvel]', { timeout: 8000 });
+}
+ok(true, 'end → summary is reliable when it races the background poll (5 rounds)');
 // server ei näe nimesid
 const leak = (await db.query(`select roster_enc || list_enc as blob from kohalolek.grp`)).rows[0].blob;
 ok(!/Näidis|Brita/.test(leak), 'no names in server blobs');

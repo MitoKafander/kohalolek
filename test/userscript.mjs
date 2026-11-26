@@ -27,5 +27,24 @@ ok(await state() === null, 'button removed after leaving the journal');
 // 5) kande aken: riba tekib tabeli kohale
 await p.evaluate(() => { document.getElementById('app').innerHTML = '<add-entry><table class="tahvel-table"><tbody><tr><td>1</td><td><div class="student-cell"><span><span>Näidis Brita</span><span>, G</span></span></div></td></tr></tbody></table></add-entry>'; }); await wait(900);
 ok(await p.evaluate(() => !!document.querySelector('add-entry [data-koh="bar"]')), 'entry toolbar appears');
+// 6) kinnitatud puudumistõend: P klõps muudab lahtri Tahvlis V-ks ja H/P linnukesed kaovad
+const v = await p.evaluate(async () => {
+  const cb = (name, label) => `<checkbox formcontrolname="${name}"><button type="button" class="c-button"><div class="box"></div><span> ${label} </span></button></checkbox>`;
+  const row = (name, excusedOnP) => `<tr data-x="${excusedOnP ? 1 : 0}"><td>1</td><td><div class="student-cell"><span><span>${name}</span><span>, G</span></span></div></td><td>${cb('isLessonAbsence', '')}</td><td><div><div class="checkbox-row">${cb('absenceLate', 'H')}${cb('absenceWithoutReason', 'P')}</div></div></td></tr>`;
+  document.getElementById('app').innerHTML = `<add-entry><table class="tahvel-table"><tbody>${row('Näidis Tõendiga', true)}${row('Näidis Tavaline', false)}${row('Näidis Kohal', false)}</tbody></table></add-entry>`;
+  const dialog = document.querySelector('add-entry');
+  dialog.addEventListener('click', ev => {   // jäljendab Tahvlit
+    const b = ev.target.closest('checkbox button'); if (!b) return;
+    const tr = b.closest('tr'), c = b.closest('checkbox');
+    if (tr.dataset.x === '1' && c.getAttribute('formcontrolname') === 'absenceWithoutReason') { b.closest('td').innerHTML = '<div><div class="checkbox-row"><span> V </span></div></div>'; return; }
+    b.querySelector('.box').classList.toggle('checked');
+  });
+  const data = { kind: 'kohalolek', title: 't', entry: null, students: [{ name: 'Näidis Tõendiga', status: 'P', per: null, missed: [] }, { name: 'Näidis Tavaline', status: 'P', per: null, missed: [] }, { name: 'Näidis Kohal', status: 'K', per: null, missed: [] }] };
+  const rep = await window.__kohTahvel.apply(dialog, data);
+  const rep2 = await window.__kohTahvel.apply(dialog, data);   // teine kord: V on juba ees
+  return { excused: rep.excused, P: rep.P, skipped: rep.skipped, second: { excused: rep2.excused, skipped: rep2.skipped.length, P: rep2.P } };
+});
+ok(v.excused.join() === 'Näidis Tõendiga' && v.P.join() === 'Näidis Tavaline' && v.skipped.length === 0, 'P turned into V by Tahvel is reported as excused, not as a failure: ' + JSON.stringify(v));
+ok(v.second.skipped === 1 && v.second.P.join() === 'Näidis Tavaline', 'second paste leaves the existing V alone: ' + JSON.stringify(v.second));
 console.log(`userscript DOM: ${pass} passed, ${fail} failed` + (errs.length ? ' | errors: ' + errs.join('; ') : ''));
 await b.close(); process.exit(fail || errs.length ? 1 : 0);

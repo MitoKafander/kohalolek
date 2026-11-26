@@ -29,6 +29,19 @@ export async function startShim({ siteDir, migration, port = 8791 }) {
       } catch (e) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ message: String(e) })); }
       return;
     }
+    if (url.pathname === '/tunniplaan/data/snap.json') {
+      // tunniplaan, kus rühmal NÄIDIS-26 käib praegu 3-tunnine plokk (algab kellast, mis praegu käib)
+      const K = ['08:30', '09:15', '10:15', '11:00', '12:45', '13:30', '14:30', '15:15', '16:15', '17:00', '18:00', '18:45', '19:45', '20:30'];
+      const now = new Date(), nm = now.getHours() * 60 + now.getMinutes(), mins = t => +t.split(':')[0] * 60 + +t.split(':')[1];
+      let k = 0; K.forEach((t, i) => { if (mins(t) <= nm + 10) k = i; });
+      const hm = m => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+      const mon = new Date(now); mon.setDate(mon.getDate() - (mon.getDay() + 6) % 7);
+      const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      const block = { day: (now.getDay() + 6) % 7, start: hm(Math.min(nm, mins(K[k]))), end: hm(nm + 100), subject: 'Proovitund', group: 'NÄIDIS-26', hours: 3, lessons: `${k + 1}–${k + 3}` };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ kesklinn: { versions: [{ name: 'Test', from: iso(mon), blocks: [block], bells: [] }] }, mustamae: { versions: [] } }));
+      return;
+    }
     let p = decodeURIComponent(url.pathname); if (p.endsWith('/')) p += 'index.html';
     if (p === '/config.js') { res.writeHead(200, { 'Content-Type': mime['.js'] }); res.end(`window.KOH_CONFIG={url:'http://localhost:${port}',key:'test'};`); return; }
     const f = path.join(siteDir, p);

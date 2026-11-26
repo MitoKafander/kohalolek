@@ -4,6 +4,9 @@ QR-põhine kohaloleku märkimine tunnis. Õpetaja näitab ekraanil vahetuvat QR-
 selle telefoniga ja on nimekirjas kohal. Tunni lõpus saab tulemuse ühe klõpsuga Tahvli päevikukande
 vormi, kus õpetaja selle üle vaatab ja ise salvestab.
 
+**Seis 26.11.2026:** leht, server ja Tahvli skript (0.3.0) töötavad; päris tunnis veel proovimata.
+Arendust jätkates loe esmalt [RESUME_HERE.md](RESUME_HERE.md); muudatused on [CHANGELOG.md](CHANGELOG.md)-s.
+
 ## Osad
 
 | Osa | Kus | Mida teeb |
@@ -75,6 +78,6 @@ npm install
 npm test        # andmebaasi loogika (PGlite) + läbiv test Chrome'is, ekraanipildid test/shots/
 ```
 
-Paigaldus: `supabase db push` rakendab migratsiooni, `site/config.js` sisaldab projekti aadressi ja
-avalikku võtit, GitHub Pages avaldab kausta `site/` igal `main` push'il. Uue tööruumi loomiseks on
-vaja kutsekoodi (tabel `kohalolek.invite`, hoitakse räsina).
+Paigaldus: migratsioonid kaustas `supabase/migrations/` käivitatakse Supabase'i halduse API kaudu (vt
+RESUME_HERE.md), `site/config.js` sisaldab projekti aadressi ja avalikku võtit, GitHub Pages avaldab kausta
+`site/` igal `main` push'il. Uue tööruumi loomiseks on vaja kutsekoodi (tabel `kohalolek.invite`, hoitakse räsina).

@@ -70,6 +70,8 @@ label.chk{display:inline-flex;gap:6px;align-items:center;font-size:14px;cursor:p
 .acts{display:flex;flex-wrap:wrap;gap:6px;padding:8px 4px 12px;border-bottom:1px solid var(--line)}
 .grp{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
 .hidden-names .n{filter:blur(7px)}
+/* telefonis märkmete vaates jääb tunni seadete plokk peitu, et tabel oleks kohe ees (seaded on vahekaardil Kohalolek) */
+@media (max-width:860px){.mark .sets{display:none}}
 .panes{display:inline-grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px}
 .panes button{font:inherit;font-size:14px;border:0;background:transparent;color:var(--muted);padding:7px 14px;border-radius:7px;cursor:pointer}
 .panes button[aria-current=true]{background:var(--accent);color:var(--accent-ink);font-weight:700}
@@ -474,7 +476,7 @@ function exportText() {
 /* ---------- vaated ---------- */
 function render() {
   const fn = { login: vLogin, home: vHome, group: vGroup, history: vHistory, session: vSession }[V.view] || vLogin;
-  app.className = 'wrap' + (V.view === 'session' ? '' : ' narrow');
+  app.className = 'wrap' + (V.view === 'session' ? (ui.pane === 'mark' ? ' mark' : '') : ' narrow');
   app.innerHTML = fn();
   if (V.view === 'session') { ui.frame = frameKey(); updateSession(); }
 }
@@ -536,14 +538,14 @@ function vSession() {
   const s = SS.session, g = group(s.group_id), ended = !!s.ended_at, M = metaOf();
   return `<div class="row between">
     <div class="row"><button class="btn" data-act="home">← Rühmad</button><h1>${esc(g.label)}</h1><span class="muted mono">${dmy(s.start_at)}</span></div>
-    <div class="row">
+    <div class="row sets">
       <label class="small muted">Tund algas <input type="time" id="startAt" value="${hm(s.start_at)}"></label>
       <label class="small muted">õigeaegne kuni + <input type="number" id="ontime" min="0" max="60" value="${s.ontime_min}"> min</label>
       <label class="small muted">algustund <select id="mNr">${BELLS[campusOf(g)].map((b, i) => `<option value="${i + 1}"${M.nr === i + 1 ? ' selected' : ''}>${i + 1}. · ${b}</option>`).join('')}</select></label>
       <label class="small muted">tunde <input type="number" id="mN" min="1" max="12" value="${M.n}"></label>
       ${ended ? '' : `<button class="btn" data-act="round">Uus kontroll</button><button class="btn primary" data-act="end">Lõpeta tund</button>`}
     </div></div>
-  <div class="row small muted">Tahvli kanne:
+  <div class="row small muted sets">Tahvli kanne:
     <select id="mType"><option value="">liik valimata</option>${ENTRY_TYPES.map(x => `<option${M.type === x ? ' selected' : ''}>${x}</option>`).join('')}</select>
     ${CAPS.map(x => `<label class="chk"><input type="checkbox" data-cap="${x}"${M.cap.includes(x) ? ' checked' : ''}> ${x.toLowerCase()}</label>`).join('')}
     <span id="ttNote">${M.tt ? '· tunniplaanist: ' + esc(M.tt) : ''}</span>

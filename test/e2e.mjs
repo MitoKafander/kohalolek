@@ -143,6 +143,10 @@ ok(await cell('Näidis Brita', 'Telefon').textContent() === '2' && await cell('N
 ok(await cell('Näidis Carl', 'Tubli').getAttribute('class').then(c => c.includes('k1')), 'praise cells are styled as praise');
 const sent = await T.locator('#matrix .txt').allTextContents();
 ok(sent.length === 3 && /^Kasutas tunnis telefoni ilma õpetaja loata \(2 korda, kell \d\d\.\d\d, \d\d\.\d\d; ÕKE p 23\.4\.10\)\.$/.test(sent[0]) && sent[1] === 'Töötas tunnis keskendunult ja tegi ettenähtud töö ära.' && /^Magas tunnis \(kell \d\d\.\d\d; ÕKE p 23\.4\.20\)\. Aitas kaasõpilasi\.$/.test(sent[2]), 'sentences for Tahvel: ' + JSON.stringify(sent));
+await T.setViewportSize({ width: 390, height: 800 });
+ok(!(await T.isVisible('#startAt')) && await T.isVisible('table.mx'), 'phone width: lesson settings hidden in the notes view');
+await T.setViewportSize({ width: 1280, height: 800 });
+ok(await T.isVisible('#startAt'), 'wide screen: lesson settings stay visible in the notes view');
 await T.click('button[data-act=pane][data-pane=koh]'); await T.waitForSelector('#qr svg');
 ok((await T.textContent('button.st:has-text("Näidis Brita")')).includes('märkeid 2'), 'attendance list shows the note count');
 // uus kontroll: Carl skaneerib, Brita mitte

@@ -52,6 +52,8 @@ ainult ühe). Tüüpe ja lauseid saab muuta rühmade lehel („Märkuste ja kiit
   seda, mitu märget tunnis on ja millal need tehti.
 - Õpilase telefon saab oma rühma nimekirja lahti võtmega, mis on QR-koodis. Seega näeb rühma nimesid
   ainult see, kes on klassis ja koodi skannib.
+- Tunnid koos skaneeringute ja märkmetega kustutatakse serverist 7 päeva pärast tundi (tööruumi seade).
+  Ametlik kirje on Tahvlis; siin on ainult tööks vajalik koopia.
 - Tahvlisse liiguvad andmed õpetaja lõikelaua kaudu. Skript Tahvlis midagi ise ei salvesta.
 
 ## Petmise vastu

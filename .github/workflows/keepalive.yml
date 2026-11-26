@@ -1,4 +1,4 @@
-name: Hoia Supabase ärkvel
+name: Hoia Supabase ärkvel ja korista
 
 # Tasuta Supabase'i projekt uinub, kui 7 päeva pole ühtegi päringut (nt koolivaheajal).
 # See teeb kaks korda nädalas ühe kahjutu päringu (vale parooliga sisselogimine, vastus ok:false).
@@ -23,3 +23,5 @@ jobs:
             -H "apikey: $key" -H "Content-Type: application/json" -d '{"p_code":"keepalive","p_auth":"x"}')
           echo "HTTP $code: $(cat /tmp/out)"
           test "$code" = "200"
+          # Varukäivitus aegunud tundide kustutamisele (põhiline käib andmebaasis igal ööl); vastuses on kustutatud tundide arv.
+          curl -s -m 30 -X POST "$url/rest/v1/rpc/koh_cleanup" -H "apikey: $key" -H "Content-Type: application/json" -d '{}'

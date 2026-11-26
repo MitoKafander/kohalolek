@@ -35,7 +35,7 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
   `~/.config/kohalolek/proov_parool.txt`. Korista enda järelt: kustuta proovitund, eemalda sidumised.
 - **Kutsekoodid:** kõik seni tehtud on kasutatud. Uus:
   `insert into kohalolek.invite (code_hash, note) values (encode(sha256(convert_to('KOOD','utf8')),'hex'), 'märkus');`
-- **Testid:** `npm test` = andmebaasi loogika (PGlite, 55), läbiv test Chrome'is (66), skript jäljendatud Tahvli
+- **Testid:** `npm test` = andmebaasi loogika (PGlite, 62), läbiv test Chrome'is (69), skript jäljendatud Tahvli
   vormil (11). Ekraanipildid `test/shots/`.
 - **Päris Tahvli vormi kontroll** vajab kasutaja sisselogimist. Töövõte: eraldi Chrome
   `--remote-debugging-port=9377 --user-data-dir=<ajutine>` ja `playwright-core` `connectOverCDP`. Reeglid: vormi
@@ -50,6 +50,8 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
 - Päris Tahvli vormil (salvestamata): P/H linnukesed, selgitus + „Märkus“, kande päis (liik, maht, kuupäev,
   algustund, tundide arv), tunnikaupa P/H veeru „123?“ kaudu, korduv kleepimine, nimekirja kopeerimise nupp.
 - Tunniplaanist eeltäitmine päris tunniplaani andmetega (õiged algustunnid ja tundide arvud mitmel päeval).
+- Säilitustähtaeg: kõigil tööruumidel 7 päeva, `cron.job` „kohalolek-cleanup“ iga öö 01:23 UTC (aktiivne),
+  käsitsi käivitus töötab. Esimest päris kustutamist pole veel näinud (ühtegi nii vana tundi ei ole).
 - Kasutaja on päris telefoniga skanninud ning loonud oma tööruumi ja rühma; serveris on 3 tööruumi.
 
 ## Proovimata
@@ -82,6 +84,9 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
 - **Tunniplaanist eeltäitmine** sõltub naaberlehe failist `/tunniplaan/data/snap.json`; rühma nimi peab klappima
   EduPage'i rühma koodiga. Testides annab selle võltsandmetega `test/shim.mjs`.
 - **Pages'i töövoog:** üleslaadimine ja avaldamine peavad olema eraldi töödes (samas töös „0 artifacts“).
-- **Tasuta Supabase** uinub 7 päeva jõudeoleku järel; `.github/workflows/keepalive.yml` teeb päringu E ja N.
+- **Tasuta Supabase** uinub 7 päeva jõudeoleku järel; `.github/workflows/keepalive.yml` teeb päringu E ja N
+  ning käivitab varuks `koh_cleanup`. Uinunud projektis `pg_cron` ei jookse.
+- **Kustutamine** eemaldab ainult tunnid (kaskaadiga skaneeringud, parandused, märkmed). Nimekirjad ja
+  sidumised jäävad; kui neile on vaja tähtaega, tuleb see eraldi teha.
 - **iPhone'i Safari** kustutab 7 päeva kasutamata saidi andmed: pärast vaheaega võib telefoni sidumine kaduda,
   siis küsib õpilane nime uuesti ja õpetaja vajutab „Luba“.

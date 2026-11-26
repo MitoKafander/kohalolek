@@ -34,7 +34,7 @@ footer{max-width:520px;margin:16px auto 0;font-size:13px;color:var(--muted);text
 </head>
 <body>
 <main id="view"><div class="card"><p class="muted">Laen…</p></div></main>
-<footer>Sellesse telefoni salvestatakse juhuslik seadmekood. Server hoiab seadmekoodi räsi ja skaneerimise kellaaega. Nimesid server lugeda ei saa.</footer>
+<footer>Sellesse telefoni salvestatakse juhuslik seadmekood. Server hoiab seadmekoodi räsi ja skaneerimise kellaaega. Nimesid server lugeda ei saa.<span id="retNote"></span></footer>
 <script src="config.js"></script>
 <script src="lib/common.js"></script>
 <script>
@@ -116,6 +116,7 @@ footer{max-width:520px;margin:16px auto 0;font-size:13px;color:var(--muted);text
   let r;
   try { r = await KOH.rpc('koh_checkin', { p_session: session, p_token: token, p_device: device }); } catch (e) { return failed(); }
   history.replaceState(null, '', location.pathname); // kood ei jää aadressiribale ega ajalukku
+  if (Number.isInteger(r.retain_days)) document.getElementById('retNote').textContent = ` Tunni andmed kustutatakse serverist ${r.retain_days} päeva pärast tundi.`;
   await readList(r.list_enc);
   if (r.status === 'ok') return ok(r);
   if (r.status === 'bind') return names.size ? pick(r.taken || []) : failed();

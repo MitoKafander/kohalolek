@@ -36,6 +36,9 @@ ok((await T.inputValue('#gNames')).split('\n').length === 4, 'paste filled 4 nam
 await T.click('button[data-act=save-group]');
 await T.waitForSelector('button[data-act=start]');
 ok((await T.textContent('.card .small')).includes('4 õpilast'), 'group card shows 4 students');
+ok(await T.inputValue('#retDays') === '7', 'retention setting shown, default 7 days');
+await T.selectOption('#retDays', '14'); await T.waitForSelector('.banner');
+ok((await T.textContent('.banner')).includes('14 päeva') && await T.inputValue('#retDays') === '14', 'retention changed to 14 days');
 await T.screenshot({ path: SHOTS + '/1-home.png' });
 await T.click('button[data-act=start]');
 await T.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg'));
@@ -74,6 +77,7 @@ await S1.click('button[data-slot]:has-text("Näidis Brita")');
 await S1.click('#yes');
 await S1.waitForSelector('.card.ok');
 ok((await S1.textContent('.card.ok')).includes('Näidis Brita'), 's1 bound + checked in as Brita');
+ok((await S1.textContent('footer')).includes('kustutatakse serverist 14 päeva pärast'), 'student page states the retention period');
 ok(!(await S1.evaluate(() => location.hash)), 's1 hash cleared from address bar');
 await S1.screenshot({ path: SHOTS + '/3-student-ok.png' });
 // teine skaneerimine samast telefonist → kohe kohal

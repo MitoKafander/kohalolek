@@ -39,3 +39,10 @@
 ### Lahtised asjad
 - Päris tunnis proovimata; „Kiitus“ linnuke ja V-juhtum päris Tahvlis proovimata.
 - Perioodi kokkuvõte rühmajuhendajale ja teise õpetaja tunniplaani eeltäitmine: otsustamata.
+
+### Säilitustähtaeg (hiljem samal päeval)
+- Tunnid koos skaneeringute, käsitsi paranduste ja märkmetega kustutatakse serverist 7 päeva pärast tundi
+  (tööruumi seade, muudetav rühmade lehel). Kustutamine käib andmebaasis igal ööl; GitHubi töövoog käivitab
+  sama koristuse varuks kaks korda nädalas.
+- Õpilase leht ütleb tähtaja välja; ajalugu näitab iga tunni kustumise kuupäeva.
+- Rühmade nimekirjad ja telefonide sidumised jäävad alles, kuni õpetaja rühma kustutab.

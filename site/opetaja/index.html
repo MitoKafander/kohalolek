@@ -136,6 +136,7 @@ let offset = 0;          // serveri kell miinus selle seadme kell
 let timers = [];
 let lastQrKey = '';
 let NT = { types: DEFAULT_TYPES.map(t => ({ ...t })), oke: true };   // tööruumi seaded
+let RET = null;          // mitu päeva pärast tundi server tunni andmed kustutab (null = vanem server)
 const noteCache = new Map();   // märke id → lahti krüpteeritud {s: koht, t: tüüp, at: aeg}
 const ui = { tab: 'login', msg: '', openSlot: null, hide: false, net: true, frame: '', hold: null, pane: 'koh' };
 try { ui.hide = localStorage.getItem('koh-hide') === '1'; } catch (e) {}
@@ -219,6 +220,7 @@ const cleanName = n => n.replace(/^\s*\d+[.)]\s*/, '').replace(/\s+/g, ' ').trim
 async function applyLogin(r) {
   offset = r.now - Date.now();
   NT = { types: DEFAULT_TYPES.map(t => ({ ...t })), oke: true };
+  RET = Number.isInteger(r.retain_days) ? r.retain_days : null;
   if (r.settings_enc) { try { const o = await KOH.decrypt(A.enc, r.settings_enc); if (o && Array.isArray(o.types) && o.types.length) NT = { types: o.types, oke: o.oke !== false }; } catch (e) {} }
   const out = [];
   for (const g of r.groups) {
@@ -507,6 +509,9 @@ function vHome() {
   ${ui.msg ? `<div class="banner">${esc(ui.msg)}</div>` : ''}
   ${cards || '<div class="card"><p class="muted" style="margin:0">Rühmi pole veel. Lisa esimene rühm või impordi nimekirjad.</p></div>'}
   <div class="row"><button class="btn primary" data-act="new-group">Uus rühm</button><label class="btn" for="impFile">Impordi fail</label><input type="file" id="impFile" accept=".json,application/json,text/plain" hidden></div>
+  ${RET === null ? '' : `<div class="card"><label class="small muted">Tunnid koos skaneeringute ja märkmetega kustutatakse serverist
+    <select id="retDays">${[...new Set([7, 14, 30, 60, 90, 180, RET])].sort((a, b) => a - b).map(d => `<option value="${d}"${d === RET ? ' selected' : ''}>${d}</option>`).join('')}</select> päeva pärast tundi.</label>
+    <p class="small muted" style="margin:0">Tahvlisse kantut see ei puuduta. Rühmade nimekirjad ja telefonide sidumised jäävad alles, kuni rühma kustutad.</p></div>`}
   <details class="card"><summary><strong>Märkuste ja kiituste tüübid</strong> <span class="small muted">(veerud ja Tahvli laused)</span></summary>
     <p class="small muted" style="margin:0">Iga rida: veeru nimi | lause Tahvlisse | ÕKE punkt (võib tühjaks jätta). Kiituse rida algab plussiga, nt „+Tubli | töötas tunnis keskendunult“. Telefoni ekraanile mahub hästi kuni 8 veergu.</p>
     <textarea id="ntTypes" rows="9">${esc(NT.types.map(t => (t.k === 'K' ? '+' : '') + [t.label, t.text, t.oke].join(' | ')).join('\n'))}</textarea>
@@ -531,7 +536,7 @@ function vGroup() {
 function vHistory() {
   const g = group(V.id), list = V.sessions || [];
   return `<div class="row between"><h1>${esc(g.label)} · ajalugu</h1><button class="btn" data-act="home">← Rühmad</button></div>
-  <div class="card">${list.length ? `<div class="list">${list.map(s => `<button class="st" style="grid-template-columns:minmax(0,1fr) auto" data-act="resume" data-id="${esc(s.id)}"><span class="n mono">${dmy(s.start_at)} kell ${hm(s.start_at)}${s.teacher ? ' · ' + esc(s.teacher) : ''}${s.ended_at ? '' : '<span class="tag">käib</span>'}</span><span class="d">skaneeris ${s.present}/${g.roster.students.length}</span></button>`).join('')}</div>` : '<p class="muted" style="margin:0">Selle rühmaga pole veel ühtegi tundi.</p>'}</div>`;
+  <div class="card">${list.length ? `<div class="list">${list.map(s => `<button class="st" style="grid-template-columns:minmax(0,1fr) auto" data-act="resume" data-id="${esc(s.id)}"><span class="n mono">${dmy(s.start_at)} kell ${hm(s.start_at)}${s.teacher ? ' · ' + esc(s.teacher) : ''}${s.ended_at ? '' : '<span class="tag">käib</span>'}</span><span class="d">skaneeris ${s.present}/${g.roster.students.length}${RET === null ? '' : ' · kustub ' + dmy((s.ended_at || s.start_at) + RET * 864e5).slice(0, 6)}</span></button>`).join('')}</div>` : '<p class="muted" style="margin:0">Selle rühmaga pole veel ühtegi tundi.</p>'}</div>`;
 }
 function vSession() {
   if (!SS) return '<div class="card"><p class="muted" style="margin:0">Laen…</p></div>';
@@ -739,6 +744,11 @@ document.addEventListener('change', async ev => {
     else if (t.id === 'mN' && SS) { await saveMeta({ n: Math.min(12, Math.max(1, +t.value || 1)), tt: '' }); updateSession(); }
     else if (t.id === 'mType' && SS) { await saveMeta({ type: t.value }); }
     else if (t.dataset && t.dataset.cap && SS) { await saveMeta({ cap: [...document.querySelectorAll('input[data-cap]:checked')].map(x => x.dataset.cap) }); }
+    else if (t.id === 'retDays') {
+      const r = await rpc('koh_ws_retention', { ...cred(), p_days: +t.value });
+      if (r.ok) { RET = r.retain_days; ui.msg = `Tunnid kustutatakse nüüd ${RET} päeva pärast tundi.`; } else ui.msg = 'Tähtaega ei saanud salvestada.';
+      render();
+    }
     else if (t.id === 'impFile') {
       const f = t.files && t.files[0]; if (!f) return;
       const list = parseImport(await f.text());

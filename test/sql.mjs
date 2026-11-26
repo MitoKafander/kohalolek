@@ -33,7 +33,7 @@ ok((await rpc('koh_checkin', { p_session: 'nope', p_token: tok(1), p_device: D1 
 ok((await rpc('koh_checkin', { p_session: ss.id, p_token: tok(1), p_device: 'x' })).status === 'error', 'bad device id');
 ok((await rpc('koh_bind', { p_session: ss.id, p_device: D1, p_slot: 'aaaa' })).status === 'expired', 'bind without scan rejected');
 let r = await rpc('koh_checkin', { p_session: ss.id, p_token: tok(1), p_device: D1 });
-ok(r.status === 'bind' && r.list_enc === 'l' && r.taken.length === 0, 'first scan → bind');
+ok(r.status === 'bind' && r.list_enc === 'l' && r.taken.length === 0 && r.retain_days === 7, 'first scan → bind (with retention period)');
 ok((await rpc('koh_bind', { p_session: ss.id, p_device: D1, p_slot: 'zzzz' })).status === 'error', 'bind to unknown slot rejected');
 r = await rpc('koh_bind', { p_session: ss.id, p_device: D1, p_slot: 'aaaa' });
 ok(r.status === 'ok' && r.slot === 'aaaa', 'bind ok');
@@ -104,6 +104,24 @@ ok((await rpc('koh_session_state', { ...C, p_session: ss.id })).notes.length ===
 await rpc('koh_note_del', { ...C, p_session: ss.id, p_id: n1.id });
 ok((await rpc('koh_session_state', { ...C, p_session: ss.id })).notes.length === 1, 'note deleted');
 ok((await rpc('koh_ws_settings', { ...C, p_settings: 'seaded-krüpteeritult' })).ok && (await rpc('koh_ws_login', C)).settings_enc === 'seaded-krüpteeritult' && (await rpc('koh_ws_login', O)).settings_enc === null, 'workspace settings saved per workspace');
+// säilitustähtaeg
+ok((await rpc('koh_ws_login', C)).retain_days === 7, 'default retention 7 days');
+ok((await rpc('koh_ws_retention', { ...C, p_days: 0 })).err === 'range' && (await rpc('koh_ws_retention', { ...O, p_days: 30 })).retain_days === 30, 'other workspace set to 30, out of range rejected');
+ok((await rpc('koh_ws_retention', { p_code: 'test', p_auth: 'b'.repeat(64), p_days: 1 })).err === 'auth', 'retention needs auth');
+const gO = await rpc('koh_group_save', { ...O, p_id: null, p_label: 'Muu', p_roster_enc: 'r', p_list_enc: 'l', p_slots: ['aaaa'] });
+const daysAgo = n => new Date(Date.now() - n * 864e5).toISOString();
+const sOld = await rpc('koh_session_start', { ...C, p_group: gs.id, p_start_at: daysAgo(10), p_ontime: 5, p_teacher: 'T' });
+await rpc('koh_note_add', { ...C, p_session: sOld.id, p_blob: 'vana märge' });
+const sNew = await rpc('koh_session_start', { ...C, p_group: gs.id, p_start_at: daysAgo(3), p_ontime: 5, p_teacher: 'T' });
+const sOther = await rpc('koh_session_start', { ...O, p_group: gO.id, p_start_at: daysAgo(10), p_ontime: 5, p_teacher: 'T' });
+await rpc('koh_session_end', { ...O, p_session: sOther.id, p_end: true });
+await db.query(`update kohalolek.session set ended_at = start_at + interval '90 minutes' where id = any($1)`, [[sOld.id, sOther.id, ss.id]]);
+const before = (await db.query(`select count(*)::int as n from kohalolek.note`)).rows[0].n;
+const cl = await rpc('koh_cleanup', {});
+ok(cl.ok && cl.deleted_sessions === 1, 'cleanup deletes only sessions past their workspace retention: ' + JSON.stringify(cl));
+ok((await rpc('koh_session_state', { ...C, p_session: sOld.id })).err === 'notfound' && (await rpc('koh_session_state', { ...C, p_session: sNew.id })).ok && (await rpc('koh_session_state', { ...O, p_session: sOther.id })).ok, '10-day session gone at 7 days, kept at 30 days; 3-day session kept');
+ok((await db.query(`select count(*)::int as n from kohalolek.note`)).rows[0].n === before - 1, 'notes of the deleted session are gone too');
+ok((await rpc('koh_ws_login', C)).groups.length === 1, 'groups and rosters stay');
 // slot removal drops binding
 await rpc('koh_group_save', { ...C, p_id: gs.id, p_label: 'G1', p_roster_enc: 'r', p_list_enc: 'l', p_slots: ['bbbb', 'cccc'] });
 ok((await rpc('koh_ws_login', C)).groups[0].bound.length === 0, 'removed slot → binding gone');

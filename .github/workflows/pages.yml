@@ -15,19 +15,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lisa userscript saidile
+        run: cp userscript/kohalolek-tahvel.user.js site/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  # Eraldi töö: samas töös ei leidnud deploy-pages äsja üles laaditud artefakti (26.11.2026).
   deploy:
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Lisa userscript saidile
-        run: cp userscript/kohalolek-tahvel.user.js site/
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
       - id: deployment
         uses: actions/deploy-pages@v4

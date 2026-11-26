@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kohalolek → Tahvel
 // @namespace    https://mitokafander.github.io/kohalolek/
-// @version      0.1.0
+// @version      0.1.1
 // @description  Täidab Tahvli päevikukandes puudumised (P/H) ja märkused kohaloleku lehelt kopeeritud andmetest. Ise ei salvesta midagi: õpetaja vaatab üle ja vajutab „Salvesta“.
 // @match        https://tahvel.edu.ee/*
 // @updateURL    https://mitokafander.github.io/kohalolek/kohalolek-tahvel.user.js
@@ -165,16 +165,23 @@
   }
 
   /* ---------- päeviku leht: nimekirja kopeerimine ---------- */
+  /* Nupp ei tohi sõltuda Tahvli nuppude tekstist (keel võib olla ENG/RUS ja „Lisa õppijad“ ei ole igal
+   * õpetajal olemas). Eelistatult läheb ta päeviku nupuritta; kui seda ei leia, siis lehe alla paremasse nurka. */
   function addRosterButton() {
-    const m = location.hash.match(/#\/journal\/(\d+)\//);
-    const root = document.querySelector('dg-journal-edit-component');
-    if (!m || !root || root.querySelector(`[${MARK}="roster"]`)) return;
-    const anchor = [...root.querySelectorAll('tahvel-button')].find(b => /^LISA ÕPPIJAD/i.test(b.innerText.trim()));
-    if (!anchor) return;
-    const btn = el('button', BTN2 + ';margin-left:8px', 'Kopeeri nimekiri kohaloleku lehele'); btn.type = 'button';
-    btn.setAttribute(MARK, 'roster');
+    const m = location.hash.match(/#\/journal\/(\d+)(\/|$|\?)/);
+    const old = document.querySelector(`[${MARK}="roster"]`);
+    if (!m) { if (old) old.remove(); return; }
+    if (old && old.dataset.journal === m[1] && old.isConnected) {
+      if (old.dataset.floating !== '1') return;
+      // ujuv nupp: kui päeviku nupurida on vahepeal tekkinud, tõsta nupp sinna
+      if (!document.querySelector('dg-journal-edit-component .tahvel-form-buttons-left')) return;
+      old.remove();
+    } else if (old) old.remove();
+    const row = document.querySelector('dg-journal-edit-component .tahvel-form-buttons-left');
+    const btn = el('button', BTN2 + (row ? ';margin-left:8px' : ';position:fixed;right:16px;bottom:16px;z-index:9999;box-shadow:0 2px 10px rgba(0,0,0,.25)'), 'Kopeeri nimekiri kohaloleku lehele'); btn.type = 'button';
+    btn.setAttribute(MARK, 'roster'); btn.dataset.journal = m[1]; btn.dataset.floating = row ? '0' : '1';
     btn.addEventListener('click', async () => {
-      const orig = btn.textContent;
+      const orig = 'Kopeeri nimekiri kohaloleku lehele';
       try {
         const get = async u => { const r = await fetch('/hois_back' + u, { credentials: 'include', headers: { accept: 'application/json' } }); if (!r.ok) throw new Error(r.status); return r.json(); };
         const [students, journal] = await Promise.all([get(`/journals/${m[1]}/journalStudents`), get(`/journals/${m[1]}`)]);
@@ -186,7 +193,7 @@
       } catch (e) { btn.textContent = 'Ei õnnestunud'; }
       setTimeout(() => { btn.textContent = orig; }, 2500);
     });
-    anchor.after(btn);
+    if (row) row.appendChild(btn); else document.body.appendChild(btn);
   }
 
   /* ---------- käivitus: Tahvel on üheleheline rakendus, jälgi muutusi ---------- */
@@ -200,6 +207,7 @@
     } catch (e) { /* Tahvli uuendus võis vormi muuta: ära sega lehe tööd */ }
   }
   new MutationObserver(() => { if (!pending) { pending = true; setTimeout(scan, 300); } }).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('hashchange', () => setTimeout(scan, 300));
   scan();
   window.__kohTahvel = { parse, apply }; // testimiseks
 })();

@@ -1,0 +1,25 @@
+name: Hoia Supabase ärkvel
+
+# Tasuta Supabase'i projekt uinub, kui 7 päeva pole ühtegi päringut (nt koolivaheajal).
+# See teeb kaks korda nädalas ühe kahjutu päringu (vale parooliga sisselogimine, vastus ok:false).
+on:
+  schedule:
+    - cron: "17 5 * * 1,4"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Päring
+        run: |
+          url=$(grep -oE "https://[a-z0-9]+\.supabase\.co" site/config.js)
+          key=$(grep -oE "sb_publishable_[A-Za-z0-9_-]+" site/config.js)
+          code=$(curl -s -o /tmp/out -w "%{http_code}" -m 30 -X POST "$url/rest/v1/rpc/koh_ws_login" \
+            -H "apikey: $key" -H "Content-Type: application/json" -d '{"p_code":"keepalive","p_auth":"x"}')
+          echo "HTTP $code: $(cat /tmp/out)"
+          test "$code" = "200"

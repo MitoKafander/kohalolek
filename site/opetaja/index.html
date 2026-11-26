@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
+<title>Kohalolek · õpetaja</title>
+<style>
+/* Paigutus: tunni vaates vasakul suur QR ja loendur (projektorile), paremal nimekiri (õpetajale). Kitsal ekraanil üksteise all. */
+:root{--bg:#F2F4F1;--surface:#fff;--ink:#1C2827;--muted:#596765;--line:#D5DCD8;--accent:#2C6A5D;--accent-ink:#fff;--accent-soft:#DFEDE8;--warm:#A9690F;--warm-soft:#FAEDD5;--crit:#A63C27;--crit-soft:#F7DED7}
+@media (prefers-color-scheme:dark){:root{--bg:#121817;--surface:#1A2221;--ink:#E4EBE8;--muted:#94A29F;--line:#2B3634;--accent:#6DB5A3;--accent-ink:#0E1615;--accent-soft:#1E3530;--warm:#E2AA4E;--warm-soft:#3A2E17;--crit:#E57F67;--crit-soft:#41231C}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:14px max(14px,env(safe-area-inset-right)) 60px max(14px,env(safe-area-inset-left))}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.narrow{max-width:560px}
+h1{font-size:20px;margin:0}
+h2{font-size:17px;margin:0}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.mono{font-variant-numeric:tabular-nums}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.between{justify-content:space-between}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.btn{font:inherit;font-size:14px;font-weight:700;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 13px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--crit);border-color:var(--crit)}
+.btn[data-armed="1"]{background:var(--crit);border-color:var(--crit);color:var(--surface)}
+.btn:disabled{opacity:.5;cursor:default}
+input[type=text],input[type=password],input[type=time],input[type=number],textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+input[type=number]{width:64px}
+textarea{width:100%;resize:vertical;line-height:1.4}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+label.f input{font-size:16px}
+label.chk{display:inline-flex;gap:6px;align-items:center;font-size:14px;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.banner{background:var(--warm-soft);border-radius:10px;padding:10px 12px;font-size:14px}
+.banner.crit{background:var(--crit-soft)}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px}
+.tabs button{font:inherit;font-size:14px;border:0;background:transparent;color:var(--muted);padding:8px;border-radius:7px;cursor:pointer}
+.tabs button[aria-current=true]{background:var(--accent);color:var(--accent-ink);font-weight:700}
+
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:860px){.split{grid-template-columns:1fr}}
+.qrpane{align-items:center;text-align:center}
+.qrpane:fullscreen{justify-content:center;border-radius:0;border:0;padding:3vh}
+#qr{background:#fff;border-radius:10px;padding:8px;width:100%;max-width:min(640px,72vh)}
+.qrpane:fullscreen #qr{max-width:min(92vw,78vh)}
+#qr svg{display:block;width:100%;height:auto}
+.count{font-size:44px;font-weight:700;line-height:1.1}
+.qrpane:fullscreen .count{font-size:7vh}
+.stats{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;font-size:15px}
+
+.list{display:flex;flex-direction:column}
+.st{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 4px;border-bottom:1px solid var(--line);cursor:pointer;background:transparent;border-left:0;border-right:0;border-top:0;font:inherit;color:inherit;text-align:left;width:100%}
+.st:last-child{border-bottom:0}
+.chip{display:inline-flex;align-items:center;justify-content:center;width:34px;height:30px;border-radius:7px;font-weight:700;font-size:15px}
+.chip.K{background:var(--accent-soft);color:var(--accent)}
+.chip.H{background:var(--warm-soft);color:var(--warm)}
+.chip.P{background:var(--crit-soft);color:var(--crit)}
+.chip.W{border:1px dashed var(--line);color:var(--muted)}
+.st .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st .d{font-size:13px;color:var(--muted);text-align:right;white-space:nowrap}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:5px;padding:1px 5px;margin-left:6px;background:var(--warm-soft);color:var(--warm);vertical-align:1px}
+.tag.crit{background:var(--crit-soft);color:var(--crit)}
+.acts{display:flex;flex-wrap:wrap;gap:6px;padding:8px 4px 12px;border-bottom:1px solid var(--line)}
+.grp{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.hidden-names .n{filter:blur(7px)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../config.js"></script>
+<script src="../lib/qrcode.js"></script>
+<script src="../lib/common.js"></script>
+<script>
+(() => {
+const { rpc, esc, hm, dmy, pad } = KOH;
+const app = document.getElementById('app');
+const LS = 'koh-auth';
+const ROOT = new URL('../', location.href).href;
+const LATE_MS = 15 * 60000;   // ÕKE p 9.8: alla 15 min = hilinemine, 15 min või rohkem = puudumine
+const ROUND_GRACE_MS = 3 * 60000;
+
+let A = null;            // {code, auth, enc, teacher}
+let G = [];              // rühmad koos lahti krüpteeritud nimekirjaga
+let V = { view: 'login' };
+let SS = null;           // käimasoleva/avatud tunni seis serverist
+let offset = 0;          // serveri kell miinus selle seadme kell
+let timers = [];
+let lastQrKey = '';
+const ui = { tab: 'login', msg: '', openSlot: null, hide: false, busy: false, net: true };
+try { ui.hide = localStorage.getItem('koh-hide') === '1'; } catch (e) {}
+
+/* ---------- abid ---------- */
+const now = () => Date.now() + offset;
+const cred = () => ({ p_code: A.code, p_auth: A.auth });
+const group = id => G.find(g => g.id === id) || null;
+const hms = t => { const d = new Date(t); return hm(t) + ':' + pad(d.getSeconds()); };
+function loadAuth() { try { return JSON.parse(sessionStorage.getItem(LS) || localStorage.getItem(LS) || 'null'); } catch (e) { return null; } }
+function saveAuth(a, remember) {
+  try {
+    (remember ? localStorage : sessionStorage).setItem(LS, JSON.stringify(a));
+    (remember ? sessionStorage : localStorage).removeItem(LS);
+  } catch (e) {}
+}
+function stopTimers() { timers.forEach(clearInterval); timers = []; }
+function armed(btn) {
+  if (btn.dataset.armed === '1') return true;
+  btn.dataset.orig = btn.textContent; btn.dataset.armed = '1'; btn.textContent = 'Kinnita';
+  setTimeout(() => { if (btn.isConnected) { btn.dataset.armed = ''; btn.textContent = btn.dataset.orig; } }, 3500);
+  return false;
+}
+function copyText(text, btn) {
+  const fin = ok => { if (!btn) return; btn.dataset.orig = btn.dataset.orig || btn.textContent; btn.textContent = ok ? 'Kopeeritud' : 'Ei õnnestunud'; setTimeout(() => { if (btn.isConnected) btn.textContent = btn.dataset.orig; }, 1600); };
+  const fallback = () => { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e) {} ta.remove(); return ok; };
+  try { navigator.clipboard.writeText(text).then(() => fin(true), () => fin(fallback())); } catch (e) { fin(fallback()); }
+}
+function qrSvg(text) { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ scalable: true, margin: 2 }); }
+function newSlot(used) { for (;;) { const s = Math.random().toString(36).slice(2, 6).padEnd(4, '0'); if (!used.has(s)) { used.add(s); return s; } } }
+const cleanName = n => n.replace(/^\s*\d+[.)]\s*/, '').replace(/\s+/g, ' ').trim();
+
+/* ---------- sisselogimine ja rühmad ---------- */
+async function applyLogin(r) {
+  offset = r.now - Date.now();
+  const out = [];
+  for (const g of r.groups) {
+    let roster;
+    try { roster = await KOH.decrypt(A.enc, g.roster_enc); } catch (e) { roster = { kg: null, students: [], broken: true }; }
+    out.push({ ...g, roster });
+  }
+  G = out;
+}
+async function refresh() {
+  const r = await rpc('koh_ws_login', cred());
+  if (!r.ok) { logout(); return false; }
+  await applyLogin(r); return true;
+}
+function logout() {
+  stopTimers(); A = null; G = []; SS = null;
+  try { localStorage.removeItem(LS); sessionStorage.removeItem(LS); } catch (e) {}
+  V = { view: 'login' }; render();
+}
+async function saveGroup(existing, label, names, tids) {
+  const old = existing ? existing.roster.students : [];
+  const used = new Set(old.map(s => s.slot));
+  const seen = new Set();
+  const students = [];
+  for (const raw of names) {
+    const name = cleanName(raw); if (!name || seen.has(name)) continue; seen.add(name);
+    const ex = old.find(s => s.name === name);
+    const tid = (tids && tids[name]) || (ex && ex.tid) || null;
+    students.push(ex ? { ...ex, tid } : { slot: newSlot(used), name, tid });
+  }
+  const kg = (existing && existing.roster.kg) || KOH.randomKey(16);
+  const r = await rpc('koh_group_save', {
+    ...cred(), p_id: existing ? existing.id : null, p_label: label,
+    p_roster_enc: await KOH.encrypt(A.enc, { kg, students }),
+    p_list_enc: await KOH.encrypt(kg, students.map(s => [s.slot, s.name]).sort((a, b) => a[1].localeCompare(b[1], 'et'))),
+    p_slots: students.map(s => s.slot),
+  });
+  return r.ok;
+}
+/* Tahvli userscripti kopeeritud nimekiri või Tunnimärkmete impordifail. */
+function parseImport(text) {
+  let o; try { o = JSON.parse(text); } catch (e) { return null; }
+  if (o && o.kind === 'nimekiri' && Array.isArray(o.students)) {
+    return [{ label: String(o.group || o.journal || 'Rühm'), names: o.students.map(s => s.name), tids: Object.fromEntries(o.students.filter(s => s.tid).map(s => [cleanName(s.name), s.tid])) }];
+  }
+  if (o && Array.isArray(o.groups)) {
+    return o.groups.filter(g => g && g.name).map(g => ({ label: String(g.name), names: (g.students || []).filter(x => typeof x === 'string'), tids: {} }));
+  }
+  return null;
+}
+async function importGroups(list) {
+  let n = 0;
+  for (const it of list) {
+    const ex = G.find(g => g.label === it.label) || null;
+    if (!it.names.length && ex) continue;
+    if (await saveGroup(ex, it.label.slice(0, 60), it.names, it.tids)) n++;
+  }
+  await refresh();
+  return n;
+}
+
+/* ---------- tunni seis ---------- */
+async function poll() {
+  if (ui.busy) return; ui.busy = true;
+  try {
+    const r = await rpc('koh_session_state', { ...cred(), p_session: V.id });
+    ui.net = true;
+    if (r.ok) { offset = r.now - Date.now(); SS = r; } else if (r.err === 'auth') { logout(); }
+  } catch (e) { ui.net = false; }
+  ui.busy = false;
+}
+/* Iga õpilase staatus: käsitsi parandus või skaneerimise aja järgi. */
+function statuses() {
+  const s = SS.session, g = group(s.group_id), ended = !!s.ended_at, t = now();
+  const first = new Map(), byRound = {};
+  for (const c of SS.checkins) {
+    if (!first.has(c.s) || c.at < first.get(c.s).at) first.set(c.s, c);
+    (byRound[c.r] = byRound[c.r] || new Set()).add(c.s);
+  }
+  const roundAt = n => { const r = (s.rounds || []).find(x => x.n === n); return r ? r.at : s.start_at; };
+  return g.roster.students.map(stu => {
+    const c = first.get(stu.slot) || null, mark = SS.marks[stu.slot] || null;
+    let auto, late = null;
+    if (c) { const d = c.at - s.start_at; late = Math.max(0, Math.round(d / 60000)); auto = d <= s.ontime_min * 60000 ? 'K' : d < LATE_MS ? 'H' : 'P'; }
+    else auto = (ended || t >= s.start_at + LATE_MS) ? 'P' : 'W';
+    const missed = [];
+    for (let n = (c ? c.r : 1) + 1; n <= s.round; n++) {
+      const closed = n < s.round || ended || t - roundAt(n) > ROUND_GRACE_MS;
+      if (c && closed && !(byRound[n] && byRound[n].has(stu.slot))) missed.push(n);
+    }
+    return { ...stu, st: mark || auto, auto, manual: !!mark, at: c ? c.at : null, late, fresh: SS.checkins.some(x => x.s === stu.slot && x.fresh), missed, bound: SS.bound.includes(stu.slot) };
+  });
+}
+function exportTahvel() {
+  const s = SS.session, g = group(s.group_id), d = new Date(s.start_at);
+  return JSON.stringify({
+    v: 1, kind: 'kohalolek', group: g.label,
+    date: d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()), start: hm(s.start_at),
+    students: statuses().map(x => ({ name: x.name, tid: x.tid || null, status: x.st === 'W' ? 'P' : x.st, min: x.late, missed: x.missed })),
+  });
+}
+function exportText() {
+  const s = SS.session, g = group(s.group_id), st = statuses();
+  const P = st.filter(x => x.st === 'P' || x.st === 'W'), H = st.filter(x => x.st === 'H'), M = st.filter(x => x.missed.length && x.st !== 'P');
+  const lines = [`${g.label}, ${dmy(s.start_at)} kell ${hm(s.start_at)}`,
+    `Puudus (${P.length}): ${P.map(x => x.name + (x.at ? ` (saabus ${hm(x.at)})` : '')).join(', ') || '–'}`,
+    `Hilines (${H.length}): ${H.map(x => x.name + (x.late != null ? ` (+${x.late} min)` : '')).join(', ') || '–'}`];
+  if (M.length) lines.push(`Puudus hilisemas kontrollis (${M.length}): ${M.map(x => `${x.name} (kontroll ${x.missed.join(', ')})`).join(', ')}`);
+  return lines.join('\n');
+}
+
+/* ---------- vaated ---------- */
+function render() {
+  const fn = { login: vLogin, home: vHome, group: vGroup, history: vHistory, session: vSession }[V.view] || vLogin;
+  app.className = 'wrap' + (V.view === 'session' ? '' : ' narrow');
+  app.innerHTML = fn();
+  if (V.view === 'session') updateSession();
+}
+function vLogin() {
+  const create = ui.tab === 'create';
+  return `<h1>Kohalolek</h1>
+  <div class="tabs"><button data-act="tab" data-tab="login" aria-current="${!create}">Logi sisse</button><button data-act="tab" data-tab="create" aria-current="${create}">Loo tööruum</button></div>
+  <form class="card" id="loginForm">
+    <label class="f">Tööruumi nimi<input type="text" id="lCode" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+    <label class="f">Parool<input type="password" id="lPw" autocomplete="${create ? 'new-password' : 'current-password'}" required></label>
+    ${create ? `<label class="f">Parool uuesti<input type="password" id="lPw2" autocomplete="new-password" required></label>
+    <label class="f">Kutsekood<input type="text" id="lInv" autocapitalize="none" spellcheck="false" required></label>` : ''}
+    <label class="f">Sinu nimi (näha tunni ajaloos)<input type="text" id="lTeacher" maxlength="40" value="${esc((loadAuth() || {}).teacher || '')}"></label>
+    <label class="chk"><input type="checkbox" id="lRemember" checked> Jäta see seade meelde</label>
+    ${ui.msg ? `<div class="banner crit">${esc(ui.msg)}</div>` : ''}
+    <div class="row"><button class="btn primary" type="submit">${create ? 'Loo tööruum' : 'Logi sisse'}</button></div>
+    <p class="small muted" style="margin:0">${create ? 'Parooli ei saa taastada: sellest tehakse võti, millega õpilaste nimed sinu seadmes krüpteeritakse. Kui parool kaob, tuleb rühmad uuesti sisestada. Kolleegiga ühiseks kasutamiseks jaga talle tööruumi nime ja parooli.' : 'Jagatud arvutis võta linnuke „Jäta see seade meelde“ ära ja logi lõpuks välja.'}</p>
+  </form>`;
+}
+function vHome() {
+  const cards = G.map(g => {
+    const n = g.roster.students.length;
+    return `<div class="card"><div class="grp"><div><h2>${esc(g.label)}</h2><div class="small muted">${g.roster.broken ? 'Nimekirja ei saa lugeda (vale parool?)' : `${n} õpilast · ${g.bound.length} telefoni seotud${g.last ? ` · viimati ${dmy(g.last)}` : ''}`}</div></div>
+      <div class="row">${g.open ? `<button class="btn primary" data-act="resume" data-id="${esc(g.open)}">Jätka tundi</button>` : `<button class="btn primary" data-act="start" data-id="${esc(g.id)}"${n ? '' : ' disabled'}>Alusta tundi</button>`}
+      <button class="btn" data-act="history" data-id="${esc(g.id)}">Ajalugu</button><button class="btn" data-act="edit-group" data-id="${esc(g.id)}">Muuda</button></div></div></div>`;
+  }).join('');
+  return `<div class="row between"><h1>Kohalolek</h1><div class="row"><span class="small muted">${esc(A.code)}${A.teacher ? ' · ' + esc(A.teacher) : ''}</span><button class="btn" data-act="logout">Logi välja</button></div></div>
+  ${ui.msg ? `<div class="banner">${esc(ui.msg)}</div>` : ''}
+  ${cards || '<div class="card"><p class="muted" style="margin:0">Rühmi pole veel. Lisa esimene rühm või impordi nimekirjad.</p></div>'}
+  <div class="row"><button class="btn primary" data-act="new-group">Uus rühm</button><label class="btn" for="impFile">Impordi fail</label><input type="file" id="impFile" accept=".json,application/json,text/plain" hidden></div>
+  <p class="small muted" style="margin:0">Nimed krüpteeritakse selles seadmes enne serverisse saatmist. Server näeb ainult juhuslikke koode ja kellaaegu.</p>`;
+}
+function vGroup() {
+  const g = V.id ? group(V.id) : null;
+  return `<h1>${g ? 'Muuda rühma' : 'Uus rühm'}</h1>
+  <div class="card">
+    <label class="f">Rühma nimi<input type="text" id="gLabel" maxlength="60" value="${esc(g ? g.label : '')}" placeholder="nt K-VMT-26-1"></label>
+    <label class="f">Õpilased, üks nimi rea kohta. Siia võib kleepida ka Tahvlist kopeeritud nimekirja.
+      <textarea id="gNames" rows="14" placeholder="Mari Maasikas&#10;Jüri Juurikas">${esc(g ? g.roster.students.map(s => s.name).join('\n') : '')}</textarea></label>
+    ${g ? '<p class="small muted" style="margin:0">Nimekirjast eemaldatud õpilase telefoni sidumine kustub. Nime muutmine loob uue õpilase.</p>' : ''}
+    ${ui.msg ? `<div class="banner crit">${esc(ui.msg)}</div>` : ''}
+    <div class="row"><button class="btn primary" data-act="save-group">Salvesta</button><button class="btn" data-act="home">Loobu</button>
+    ${g ? `<button class="btn danger" data-act="delete-group" style="margin-left:auto">Kustuta rühm ja tunnid</button>` : ''}</div>
+  </div>`;
+}
+function vHistory() {
+  const g = group(V.id), list = V.sessions || [];
+  return `<div class="row between"><h1>${esc(g.label)} · ajalugu</h1><button class="btn" data-act="home">← Rühmad</button></div>
+  <div class="card">${list.length ? `<div class="list">${list.map(s => `<button class="st" style="grid-template-columns:minmax(0,1fr) auto" data-act="resume" data-id="${esc(s.id)}"><span class="n mono">${dmy(s.start_at)} kell ${hm(s.start_at)}${s.teacher ? ' · ' + esc(s.teacher) : ''}${s.ended_at ? '' : '<span class="tag">käib</span>'}</span><span class="d">skaneeris ${s.present}/${g.roster.students.length}</span></button>`).join('')}</div>` : '<p class="muted" style="margin:0">Selle rühmaga pole veel ühtegi tundi.</p>'}</div>`;
+}
+function vSession() {
+  if (!SS) return '<div class="card"><p class="muted" style="margin:0">Laen…</p></div>';
+  const s = SS.session, g = group(s.group_id), ended = !!s.ended_at;
+  return `<div class="row between">
+    <div class="row"><button class="btn" data-act="home">← Rühmad</button><h1>${esc(g.label)}</h1><span class="muted mono">${dmy(s.start_at)}</span></div>
+    <div class="row">
+      <label class="small muted">Tund algas <input type="time" id="startAt" value="${hm(s.start_at)}"></label>
+      <label class="small muted">õigeaegne kuni + <input type="number" id="ontime" min="0" max="60" value="${s.ontime_min}"> min</label>
+      ${ended ? '' : `<button class="btn" data-act="round">Uus kontroll</button><button class="btn primary" data-act="end">Lõpeta tund</button>`}
+    </div></div>
+  <div id="net"></div>
+  <div class="split">
+    <section class="card qrpane" id="qrpane">
+      ${ended ? `<h2>Tund on lõpetatud</h2>` : `<div id="qr"></div><div class="small muted">Ava telefoni kaamera ja skanni kood · <span class="mono" id="clock"></span><span id="roundLbl"></span></div>`}
+      <div class="count mono" id="count"></div>
+      <div class="stats" id="stats"></div>
+      <div class="row" style="justify-content:center">
+        ${ended ? `<button class="btn primary" data-act="copy-tahvel">Kopeeri Tahvli jaoks</button><button class="btn" data-act="copy-text">Kopeeri tekstina</button><button class="btn" data-act="reopen">Ava tund uuesti</button><button class="btn danger" data-act="delete-session">Kustuta tund</button>`
+          : `<button class="btn" data-act="fullscreen">Täisekraan</button>`}
+      </div>
+    </section>
+    <section class="card">
+      <div class="row between"><h2>Nimekiri</h2><label class="chk"><input type="checkbox" id="hideNames"${ui.hide ? ' checked' : ''}> Peida nimed</label></div>
+      <div id="claims"></div>
+      <div class="list" id="list"></div>
+      <p class="small muted" style="margin:0">K = kohal, H = hilines (alla 15 min), P = puudub (15 min või rohkem, ÕKE p 9.8). Puuduta nime, et staatust käsitsi muuta.</p>
+    </section>
+  </div>`;
+}
+/* Uuendab ainult muutuvaid osi, et sisestusväljad ja kerimine paigale jääksid. */
+function updateSession() {
+  if (V.view !== 'session' || !SS || !document.getElementById('list')) return;
+  const s = SS.session, st = statuses(), total = st.length;
+  const c = { K: 0, H: 0, P: 0, W: 0 }; st.forEach(x => c[x.st]++);
+  document.getElementById('count').textContent = `Kohal ${c.K + c.H} / ${total}`;
+  document.getElementById('stats').innerHTML = `<span>Hilines <strong>${c.H}</strong></span><span>Puudub <strong>${c.P}</strong></span>${c.W ? `<span>Ootel <strong>${c.W}</strong></span>` : ''}${SS.picking ? `<span>Valib nime <strong>${SS.picking}</strong></span>` : ''}`;
+  const rl = document.getElementById('roundLbl'); if (rl) rl.textContent = s.round > 1 ? ` · kontroll ${s.round}` : '';
+  document.getElementById('net').innerHTML = ui.net ? '' : '<div class="banner crit">Ühendus serveriga katkes. Proovin uuesti.</div>';
+  const nameOf = slot => (st.find(x => x.slot === slot) || {}).name || '?';
+  document.getElementById('claims').innerHTML = SS.claims.map(cl => `<div class="banner row between"><span><strong>${esc(nameOf(cl.slot))}</strong>: uus telefon tahab selle nimega siduda (${hm(cl.at)}).</span><span class="row"><button class="btn primary" data-act="claim" data-device="${esc(cl.device)}" data-ok="1">Luba</button><button class="btn" data-act="claim" data-device="${esc(cl.device)}" data-ok="0">Keela</button></span></div>`).join('');
+  const lbl = { K: 'K', H: 'H', P: 'P', W: '·' };
+  document.getElementById('list').className = 'list' + (ui.hide ? ' hidden-names' : '');
+  document.getElementById('list').innerHTML = st.map(x => {
+    let d = x.manual ? 'käsitsi' : x.at ? (x.st === 'K' ? hm(x.at) : `${x.st === 'P' ? 'saabus ' : ''}${hm(x.at)} (+${x.late} min)`) : (x.st === 'W' ? 'ootel' : '');
+    if (x.manual && x.at) d += ` · ${hm(x.at)}`;
+    const row = `<button class="st" data-act="open" data-slot="${esc(x.slot)}"><span class="chip ${x.st}">${lbl[x.st]}</span><span class="n">${esc(x.name)}${x.fresh ? '<span class="tag">uus sidumine</span>' : ''}${x.missed.length ? `<span class="tag crit">puudus kontrollis ${x.missed.join(', ')}</span>` : ''}</span><span class="d mono">${esc(d)}</span></button>`;
+    if (ui.openSlot !== x.slot) return row;
+    return row + `<div class="acts">${['K', 'H', 'P'].map(v => `<button class="btn${x.manual && x.st === v ? ' primary' : ''}" data-act="mark" data-slot="${esc(x.slot)}" data-st="${v}">${{ K: 'Kohal', H: 'Hilines', P: 'Puudub' }[v]}</button>`).join('')}<button class="btn" data-act="mark" data-slot="${esc(x.slot)}" data-st="">Automaatne</button>${x.bound ? `<button class="btn danger" data-act="unbind" data-slot="${esc(x.slot)}">Eemalda telefoni sidumine</button>` : ''}</div>`;
+  }).join('');
+}
+async function updateQr() {
+  if (V.view !== 'session' || !SS || SS.session.ended_at) return;
+  const s = SS.session, t = now(), w = Math.floor(t / KOH.STEP_MS), key = s.id + ':' + s.round + ':' + w;
+  const clock = document.getElementById('clock'); if (clock) clock.textContent = hms(t);
+  if (key === lastQrKey) return; lastQrKey = key;
+  const tok = await KOH.token(s.seed, s.round, w);
+  if (key !== lastQrKey) return;
+  const url = ROOT + '#' + s.id + '.' + tok + '.' + group(s.group_id).roster.kg;
+  const el = document.getElementById('qr'); if (el) { el.innerHTML = qrSvg(url); window.__kohUrl = url; }
+}
+async function openSession(id) {
+  stopTimers(); V = { view: 'session', id }; SS = null; ui.openSlot = null; lastQrKey = '';
+  render(); await poll();
+  if (!SS) { V = { view: 'home' }; ui.msg = 'Tundi ei saanud avada.'; render(); return; }
+  render(); updateQr();
+  timers.push(setInterval(updateQr, 500));
+  timers.push(setInterval(async () => { if (SS && SS.session.ended_at) { updateSession(); return; } await poll(); updateSession(); }, 2500));
+}
+async function goHome() { stopTimers(); SS = null; V = { view: 'home' }; try { await refresh(); } catch (e) {} if (A) render(); }
+async function act(fn, args) { const r = await rpc(fn, { ...cred(), ...args }); await poll(); return r; }
+
+/* ---------- sündmused ---------- */
+document.addEventListener('submit', async ev => {
+  if (ev.target.id !== 'loginForm') return;
+  ev.preventDefault();
+  const v = id => (document.getElementById(id) || {}).value || '';
+  const code = v('lCode').trim().toLowerCase(), pw = v('lPw'), create = ui.tab === 'create', teacher = v('lTeacher').trim();
+  const remember = document.getElementById('lRemember').checked;
+  const fail = m => { ui.msg = m; render(); document.getElementById('lCode').value = code; };
+  if (!/^[a-z0-9][a-z0-9_-]{2,31}$/.test(code)) return fail('Tööruumi nimi: 3–32 märki, väiketähed, numbrid, - ja _.');
+  if (create && pw.length < 10) return fail('Parool peab olema vähemalt 10 märki.');
+  if (create && pw !== v('lPw2')) return fail('Paroolid ei kattu.');
+  const inv = v('lInv').trim();
+  const btn = ev.target.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Arvutan võtit…';
+  try {
+    const k = await KOH.deriveKeys(code, pw);
+    if (create) {
+      const r = await rpc('koh_ws_create', { p_code: code, p_auth: k.auth, p_invite: inv });
+      if (!r.ok) return fail({ taken: 'See tööruumi nimi on juba võetud.', invite: 'Kutsekood ei kehti.', code: 'Tööruumi nimi ei sobi.' }[r.err] || 'Tööruumi ei saanud luua.');
+    }
+    const r = await rpc('koh_ws_login', { p_code: code, p_auth: k.auth });
+    if (!r.ok) return fail('Vale tööruumi nimi või parool.');
+    A = { code, auth: k.auth, enc: k.enc, teacher }; saveAuth(A, remember);
+    await applyLogin(r); ui.msg = ''; V = { view: 'home' }; render();
+  } catch (e) { fail('Ühendus serveriga ei õnnestunud.'); }
+});
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-act]'); if (!b) return;
+  const a = b.dataset.act;
+  try {
+    if (a === 'tab') { ui.tab = b.dataset.tab; ui.msg = ''; render(); }
+    else if (a === 'logout') logout();
+    else if (a === 'home') { ui.msg = ''; await goHome(); }
+    else if (a === 'new-group') { ui.msg = ''; V = { view: 'group', id: null }; render(); }
+    else if (a === 'edit-group') { ui.msg = ''; V = { view: 'group', id: b.dataset.id }; render(); }
+    else if (a === 'save-group') {
+      const label = document.getElementById('gLabel').value.trim(), names = document.getElementById('gNames').value.split(/\r?\n/).map(cleanName).filter(Boolean);
+      if (!label) { document.getElementById('gLabel').focus(); return; }
+      b.disabled = true;
+      const ok = await saveGroup(V.id ? group(V.id) : null, label, names, V.tids || null);
+      if (!ok) { ui.msg = 'Salvestamine ei õnnestunud.'; render(); return; }
+      await goHome();
+    }
+    else if (a === 'delete-group') { if (!armed(b)) return; await rpc('koh_group_delete', { ...cred(), p_id: V.id }); await goHome(); }
+    else if (a === 'start') {
+      b.disabled = true;
+      let ontime = 5; try { ontime = +(localStorage.getItem('koh-ontime') || 5); } catch (e) {}
+      const r = await rpc('koh_session_start', { ...cred(), p_group: b.dataset.id, p_start_at: new Date(now()).toISOString(), p_ontime: ontime, p_teacher: A.teacher || null });
+      if (r.ok) await openSession(r.id); else { ui.msg = 'Tundi ei saanud alustada.'; render(); }
+    }
+    else if (a === 'resume') await openSession(b.dataset.id);
+    else if (a === 'history') {
+      const r = await rpc('koh_sessions', { ...cred(), p_group: b.dataset.id });
+      V = { view: 'history', id: b.dataset.id, sessions: r.sessions || [] }; render();
+    }
+    else if (a === 'open') { ui.openSlot = ui.openSlot === b.dataset.slot ? null : b.dataset.slot; updateSession(); }
+    else if (a === 'mark') { await act('koh_mark', { p_session: V.id, p_slot: b.dataset.slot, p_status: b.dataset.st || null }); ui.openSlot = null; updateSession(); }
+    else if (a === 'unbind') { if (!armed(b)) return; await act('koh_unbind', { p_group: SS.session.group_id, p_slot: b.dataset.slot }); ui.openSlot = null; updateSession(); }
+    else if (a === 'claim') { await act('koh_claim_resolve', { p_session: V.id, p_device: b.dataset.device, p_approve: b.dataset.ok === '1' }); updateSession(); }
+    else if (a === 'round') { if (!armed(b)) return; await act('koh_session_round', { p_session: V.id }); lastQrKey = ''; render(); updateQr(); }
+    else if (a === 'end') { if (!armed(b)) return; await act('koh_session_end', { p_session: V.id, p_end: true }); if (document.fullscreenElement) document.exitFullscreen(); render(); }
+    else if (a === 'reopen') { await act('koh_session_end', { p_session: V.id, p_end: false }); lastQrKey = ''; render(); updateQr(); }
+    else if (a === 'delete-session') { if (!armed(b)) return; await rpc('koh_session_delete', { ...cred(), p_session: V.id }); await goHome(); }
+    else if (a === 'copy-tahvel') copyText(exportTahvel(), b);
+    else if (a === 'copy-text') copyText(exportText(), b);
+    else if (a === 'fullscreen') { const p = document.getElementById('qrpane'); if (document.fullscreenElement) document.exitFullscreen(); else if (p.requestFullscreen) p.requestFullscreen(); }
+  } catch (e) { ui.net = false; if (V.view === 'session') updateSession(); else { ui.msg = 'Ühendus serveriga ei õnnestunud.'; render(); } }
+});
+document.addEventListener('change', async ev => {
+  const t = ev.target;
+  try {
+    if (t.id === 'hideNames') { ui.hide = t.checked; try { localStorage.setItem('koh-hide', ui.hide ? '1' : '0'); } catch (e) {} updateSession(); }
+    else if (t.id === 'startAt' && SS && t.value) {
+      const d = new Date(SS.session.start_at), [h, m] = t.value.split(':').map(Number); d.setHours(h, m, 0, 0);
+      await act('koh_session_update', { p_session: V.id, p_start_at: d.toISOString(), p_ontime: null }); updateSession();
+    }
+    else if (t.id === 'ontime' && SS) {
+      const n = Math.min(60, Math.max(0, +t.value || 0)); try { localStorage.setItem('koh-ontime', String(n)); } catch (e) {}
+      await act('koh_session_update', { p_session: V.id, p_start_at: null, p_ontime: n }); updateSession();
+    }
+    else if (t.id === 'impFile') {
+      const f = t.files && t.files[0]; if (!f) return;
+      const list = parseImport(await f.text());
+      if (!list) { ui.msg = 'See ei ole impordifail.'; render(); return; }
+      const n = await importGroups(list); ui.msg = `Imporditud ${n} rühma.`; render();
+    }
+  } catch (e) { ui.msg = 'Ühendus serveriga ei õnnestunud.'; if (V.view !== 'session') render(); }
+});
+/* Tahvlist kopeeritud nimekirja kleepimine rühma vormi täidab nime ja õpilased korraga. */
+document.addEventListener('paste', ev => {
+  if (ev.target.id !== 'gNames') return;
+  const list = parseImport((ev.clipboardData || window.clipboardData).getData('text'));
+  if (!list || list.length !== 1) return;
+  ev.preventDefault();
+  const it = list[0], lab = document.getElementById('gLabel');
+  if (!lab.value.trim()) lab.value = it.label.slice(0, 60);
+  ev.target.value = it.names.map(cleanName).join('\n'); V.tids = it.tids;
+});
+
+/* ---------- käivitus ---------- */
+(async () => {
+  A = loadAuth();
+  if (!A) { render(); return; }
+  app.innerHTML = '<div class="card"><p class="muted" style="margin:0">Laen…</p></div>';
+  try { if (await refresh()) { V = { view: 'home' }; render(); } } catch (e) { ui.msg = 'Ühendus serveriga ei õnnestunud.'; V = { view: 'login' }; render(); }
+})();
+})();
+</script>
+</body>
+</html>

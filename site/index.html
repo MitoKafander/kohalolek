@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
+<title>Kohalolek</title>
+<style>
+:root{--bg:#F2F4F1;--surface:#fff;--ink:#1C2827;--muted:#596765;--line:#D5DCD8;--ok:#2C6A5D;--ok-soft:#DFEDE8;--warm:#A9690F;--warm-soft:#FAEDD5;--crit:#A63C27;--crit-soft:#F7DED7}
+@media (prefers-color-scheme:dark){:root{--bg:#121817;--surface:#1A2221;--ink:#E4EBE8;--muted:#94A29F;--line:#2B3634;--ok:#6DB5A3;--ok-soft:#1E3530;--warm:#E2AA4E;--warm-soft:#3A2E17;--crit:#E57F67;--crit-soft:#41231C}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:17px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));display:flex;flex-direction:column}
+main{flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px;max-width:520px;width:100%;margin:0 auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px 18px;text-align:center}
+.card.ok{background:var(--ok-soft);border-color:var(--ok)}
+.card.bad{background:var(--crit-soft);border-color:var(--crit)}
+.card.wait{background:var(--warm-soft);border-color:var(--warm)}
+.big{font-size:64px;line-height:1;margin:0 0 8px}
+h1{font-size:26px;margin:0 0 6px;text-wrap:balance}
+p{margin:6px 0}
+.name{font-size:22px;font-weight:700}
+.muted{color:var(--muted);font-size:15px}
+.list{display:flex;flex-direction:column;gap:8px;text-align:left}
+.list button{font:inherit;font-size:18px;text-align:left;padding:14px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.list button:active{transform:scale(.98)}
+.list button.taken{color:var(--muted)}
+.btn{font:inherit;font-weight:700;padding:14px 18px;border-radius:10px;border:1px solid var(--ok);background:var(--ok);color:var(--surface);cursor:pointer;width:100%}
+.btn.sec{background:transparent;color:var(--ink);border-color:var(--line)}
+.row{display:flex;gap:10px}
+footer{max-width:520px;margin:16px auto 0;font-size:13px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<main id="view"><div class="card"><p class="muted">Laen…</p></div></main>
+<footer>Sellesse telefoni salvestatakse juhuslik seadmekood. Server hoiab seadmekoodi räsi ja skaneerimise kellaaega. Nimesid server lugeda ei saa.</footer>
+<script src="config.js"></script>
+<script src="lib/common.js"></script>
+<script>
+(async () => {
+  const view = document.getElementById('view');
+  const { esc, hm } = KOH;
+  const show = html => { view.innerHTML = html; };
+  const card = (cls, big, title, body) => show(`<div class="card ${cls}">${big ? `<div class="big" aria-hidden="true">${big}</div>` : ''}<h1>${title}</h1>${body || ''}</div>`);
+
+  const parts = location.hash.slice(1).split('.');
+  if (parts.length < 3 || !parts[0]) {
+    card('', '', 'Kohalolek', '<p class="muted">Skanni telefoni kaameraga QR-kood, mida õpetaja ekraanil näitab.</p>');
+    return;
+  }
+  const [session, token, kg] = parts;
+
+  let device;
+  try {
+    device = localStorage.getItem('koh-device');
+    if (!device) { device = crypto.randomUUID(); localStorage.setItem('koh-device', device); }
+  } catch (e) {
+    card('bad', '', 'See brauser ei luba andmeid salvestada', '<p>Ava link tavalises brauseriaknas (mitte privaatses) ja skanni kood uuesti.</p>');
+    return;
+  }
+
+  let names = null; // slot -> nimi
+  async function readList(listEnc) {
+    if (!listEnc || names) return;
+    try { names = new Map(await KOH.decrypt(kg, listEnc)); } catch (e) { names = new Map(); }
+  }
+  const nameOf = slot => (names && names.get(slot)) || '';
+
+  function ok(r) {
+    const n = nameOf(r.slot);
+    card('ok', '✓', 'Kohal', `${n ? `<p class="name">${esc(n)}</p>` : ''}<p>Märgitud kell ${hm(r.at)}${r.round > 1 ? ` · kontroll ${r.round}` : ''}</p><p class="muted">Kui see ei ole sinu nimi, ütle kohe õpetajale. Lehe võid sulgeda.</p>`);
+  }
+  function expired() {
+    card('bad', '', 'Kood aegus', '<p>QR-kood vahetub iga mõne sekundi järel. Skanni ekraanilt uuesti.</p>');
+  }
+  function failed() {
+    card('bad', '', 'Ühendus ei õnnestunud', '<p>Kontrolli internetti ja skanni kood uuesti.</p>');
+  }
+
+  async function pending(slot) {
+    card('wait', '', 'Ootab õpetaja luba', `<p class="name">${esc(nameOf(slot))}</p><p>See nimi on juba seotud teise telefoniga. Ütle õpetajale, et vahetasid telefoni.</p>`);
+    for (let i = 0; i < 200; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      let r; try { r = await KOH.rpc('koh_status', { p_session: session, p_device: device }); } catch (e) { continue; }
+      if (r.status === 'ok') return ok(r);
+      if (r.status === 'denied') return card('bad', '', 'Õpetaja ei lubanud', '<p>Skanni kood uuesti ja vali oma nimi.</p>');
+      if (r.status === 'unknown') return failed();
+    }
+  }
+
+  function pick(taken) {
+    const all = [...names.entries()];
+    const free = all.filter(([slot]) => !taken.includes(slot));
+    const rows = (list, cls) => list.map(([slot, n]) => `<button class="${cls}" data-slot="${esc(slot)}">${esc(n)}</button>`).join('');
+    show(`<div class="card"><h1>Kes sa oled?</h1><p class="muted">Vali oma nimi. Telefon jääb sinuga seotuks, edaspidi piisab skaneerimisest.</p></div>
+      <div class="list">${rows(free, '')}</div>
+      ${free.length < all.length ? `<details><summary class="muted">Minu nime ei ole nimekirjas</summary><p class="muted">Need nimed on juba mõne telefoniga seotud. Vali enda oma ainult siis, kui vahetasid telefoni.</p><div class="list">${rows(all.filter(([slot]) => taken.includes(slot)), 'taken')}</div></details>` : ''}`);
+    view.onclick = ev => {
+      const b = ev.target.closest('button[data-slot]'); if (!b) return;
+      const slot = b.dataset.slot;
+      show(`<div class="card"><h1>${esc(nameOf(slot))}</h1><p>Kas see oled sina?</p><div class="row"><button class="btn sec" id="no">Ei</button><button class="btn" id="yes">Jah, see olen mina</button></div></div>`);
+      document.getElementById('no').onclick = () => pick(taken);
+      document.getElementById('yes').onclick = async () => {
+        card('', '', 'Salvestan…');
+        let r; try { r = await KOH.rpc('koh_bind', { p_session: session, p_device: device, p_slot: slot }); } catch (e) { return failed(); }
+        if (r.status === 'ok') return ok(r);
+        if (r.status === 'pending') return pending(slot);
+        if (r.status === 'expired') return expired();
+        if (r.status === 'ended') return card('bad', '', 'Tund on lõpetatud', '<p>Kohalolekut enam ei märgita.</p>');
+        failed();
+      };
+    };
+  }
+
+  let r;
+  try { r = await KOH.rpc('koh_checkin', { p_session: session, p_token: token, p_device: device }); } catch (e) { return failed(); }
+  history.replaceState(null, '', location.pathname); // kood ei jää aadressiribale ega ajalukku
+  await readList(r.list_enc);
+  if (r.status === 'ok') return ok(r);
+  if (r.status === 'bind') return names.size ? pick(r.taken || []) : failed();
+  if (r.status === 'expired') return expired();
+  if (r.status === 'ended') return card('bad', '', 'Tund on lõpetatud', '<p>Kohalolekut enam ei märgita.</p>');
+  if (r.status === 'unknown') return card('bad', '', 'Tundi ei leitud', '<p>Skanni kood õpetaja ekraanilt uuesti.</p>');
+  failed();
+})();
+</script>
+</body>
+</html>

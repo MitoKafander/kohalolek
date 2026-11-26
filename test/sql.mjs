@@ -92,6 +92,18 @@ ok((await rpc('koh_session_meta', { ...C, p_session: ss.id, p_meta: { nr: 3, n: 
 ok((await rpc('koh_session_state', { ...C, p_session: ss.id })).session.meta.n === 4, 'meta returned in state');
 ok((await rpc('koh_session_meta', { ...O, p_session: ss.id, p_meta: { n: 9 } })).err === 'notfound', 'other workspace cannot set meta');
 ok((await rpc('koh_session_meta', { ...C, p_session: ss.id, p_meta: { x: 'y'.repeat(3000) } })).err === 'size', 'oversized meta rejected');
+// märkmed ja seaded
+const n1 = await rpc('koh_note_add', { ...C, p_session: ss.id, p_blob: 'krüpteeritud-1' });
+const n2 = await rpc('koh_note_add', { ...C, p_session: ss.id, p_blob: 'krüpteeritud-2' });
+ok(n1.ok && n2.ok && n1.id !== n2.id, 'notes added');
+ok((await rpc('koh_note_add', { ...O, p_session: ss.id, p_blob: 'x' })).err === 'notfound', 'other workspace cannot add notes');
+ok((await rpc('koh_note_add', { ...C, p_session: ss.id, p_blob: 'y'.repeat(4000) })).err === 'size', 'oversized note rejected');
+ok((await rpc('koh_session_state', { ...C, p_session: ss.id })).notes.map(n => n.blob).join() === 'krüpteeritud-1,krüpteeritud-2', 'notes returned in order');
+await rpc('koh_note_del', { ...O, p_session: ss.id, p_id: n1.id });
+ok((await rpc('koh_session_state', { ...C, p_session: ss.id })).notes.length === 2, 'other workspace cannot delete notes');
+await rpc('koh_note_del', { ...C, p_session: ss.id, p_id: n1.id });
+ok((await rpc('koh_session_state', { ...C, p_session: ss.id })).notes.length === 1, 'note deleted');
+ok((await rpc('koh_ws_settings', { ...C, p_settings: 'seaded-krüpteeritult' })).ok && (await rpc('koh_ws_login', C)).settings_enc === 'seaded-krüpteeritult' && (await rpc('koh_ws_login', O)).settings_enc === null, 'workspace settings saved per workspace');
 // slot removal drops binding
 await rpc('koh_group_save', { ...C, p_id: gs.id, p_label: 'G1', p_roster_enc: 'r', p_list_enc: 'l', p_slots: ['bbbb', 'cccc'] });
 ok((await rpc('koh_ws_login', C)).groups[0].bound.length === 0, 'removed slot → binding gone');

@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Kohalolek → Tahvel
 // @namespace    https://mitokafander.github.io/kohalolek/
-// @version      0.2.1
-// @description  Täidab Tahvli päevikukandes puudumised (P/H) ja märkused kohaloleku lehelt kopeeritud andmetest. Ise ei salvesta midagi: õpetaja vaatab üle ja vajutab „Salvesta“.
+// @version      0.3.0
+// @description  Täidab Tahvli päevikukandes puudumised (P/H), märkused ja kiitused kohaloleku lehelt kopeeritud andmetest. Ise ei salvesta midagi: õpetaja vaatab üle ja vajutab „Salvesta“.
 // @match        https://tahvel.edu.ee/*
 // @updateURL    https://mitokafander.github.io/kohalolek/kohalolek-tahvel.user.js
 // @downloadURL  https://mitokafander.github.io/kohalolek/kohalolek-tahvel.user.js
@@ -13,7 +13,8 @@
  * 1. Päeviku lehel: nupp „Kopeeri nimekiri kohaloleku lehele“ (nimed + Tahvli õpilase id lõikelauale).
  * 2. Kande aknas („Lisa uus sissekanne“ või kande muutmine): nupp „Kleebi kohalolek või märkused“.
  *    - kohaloleku lehe „Kopeeri Tahvli jaoks“ → täidab kande päise (liik, maht, kuupäev, algustund, tundide arv)
- *      ja paneb P ja H linnukesed, mitme tunni korral tunni kaupa (veerg „123?“);
+ *      ja paneb P ja H linnukesed, mitme tunni korral tunni kaupa (veerg „123?“); tunni ajal tehtud märkused ja
+ *      kiitused lähevad selgituse lahtrisse linnukesega „Märkus“ või „Kiitus“;
  *    - Tunnimärkmete „Kopeeri kõik nimedega“ (read „Nimi: tekst“) → kirjutab selgituse ja paneb linnukese „Märkus“.
  * Skript ainult täidab vormi. Salvestamise nuppu ta ei puuduta.
  */
@@ -35,7 +36,7 @@
       const o = JSON.parse(text);
       if (o && Array.isArray(o.students)) {
         return { kind: o.kind === 'kohalolek' ? 'kohalolek' : 'markused', title: [o.group, o.date, o.start].filter(Boolean).join(' · '), entry: o.entry || null,
-          students: o.students.map(s => ({ name: s.name, status: s.status || null, per: Array.isArray(s.per) ? s.per : null, min: s.min, missed: s.missed || [], remark: s.remark || null })) };
+          students: o.students.map(s => ({ name: s.name, status: s.status || null, per: Array.isArray(s.per) ? s.per : null, min: s.min, missed: s.missed || [], remark: s.remark || null, remarkKind: s.remarkKind === 'K' ? 'K' : 'M' })) };
       }
       return null;
     } catch (e) { /* ei ole JSON: proovi „Nimi: tekst“ ridu */ }
@@ -143,7 +144,7 @@
   }
 
   async function apply(dialog, data) {
-    const rep = { P: [], H: [], partial: [], cleared: [], excused: [], remarks: [], skipped: [], notInData: [], late: [], missed: [], head: [], headKept: [], headFail: [] };
+    const rep = { P: [], H: [], partial: [], cleared: [], excused: [], remarks: [], praises: [], skipped: [], notInData: [], late: [], missed: [], head: [], headKept: [], headFail: [] };
     if (data.kind === 'kohalolek' && data.entry) await fillHeader(dialog, data.entry, rep);
     const rows = rowsOf(dialog);
     const lessonsInp = dialog.querySelector('tahvel-input[formcontrolname="lessons"] input');
@@ -202,8 +203,9 @@
         else if (ta.value.trim() && ta.value.trim() !== s.remark.trim()) rep.skipped.push(`${row.name} (selgitus on juba kirjas, ei kirjutanud üle)`);
         else {
           setText(ta, s.remark.slice(0, 1000));
-          await setBox(q('remark'), true);
-          rep.remarks.push(row.name);
+          const praise = s.remarkKind === 'K';      // Tahvel lubab korraga ainult ühe: Kiitus või Märkus
+          await setBox(q(praise ? 'praise' : 'remark'), true);
+          (praise ? rep.praises : rep.remarks).push(row.name);
           if (!row.tr.style.boxShadow) row.tr.style.boxShadow = 'inset 4px 0 0 #2C6A5D';
         }
       }
@@ -218,13 +220,13 @@
     let h = `<div><strong>Täidetud${data.title ? ' · ' + data.title.replace(/[&<>]/g, '') : ''}.</strong> Vaata üle ja vajuta ise „Salvesta“.</div>`;
     h += line('Päis täidetud', rep.head) + line('Päises jäi muutmata', rep.headKept, '#A63C27') + line('Päises ei õnnestunud', rep.headFail, '#A63C27');
     if (data.kind === 'kohalolek') h += line('P pandud', rep.P, '#A63C27') + line('H pandud', rep.H, '#A9690F') + line('Tunni kaupa märgitud', rep.partial, '#A9690F') + line('Tahvel märkis ise V või PR (kinnitatud puudumine)', rep.excused, '#2C6A5D') + line('Linnuke eemaldatud', rep.cleared);
-    h += line('Märkus kirjutatud', rep.remarks, '#2C6A5D');
+    h += line('Märkus kirjutatud', rep.remarks, '#A9690F') + line('Kiitus kirjutatud', rep.praises, '#2C6A5D');
     h += line('P, sest saabus hiljem kui 15 min (mitmetunnise kande puhul otsusta ise)', rep.late);
     h += line('Skaneeris alguses, aga puudus hilisemas kontrollis (otsusta ise)', rep.missed, '#A63C27');
     h += line('Jäi vahele', rep.skipped, '#A63C27');
     h += line('Andmetes on, Tahvli kandes ei ole', rep.notInTahvel, '#A63C27');
     h += line('Tahvli kandes on, andmetes ei ole (jäi muutmata)', rep.notInData, '#A63C27');
-    if (!rep.P.length && !rep.H.length && !rep.partial.length && !rep.remarks.length && !rep.cleared.length && rep.notInTahvel.length === data.students.length) h += '<div style="margin-top:3px;color:#A63C27"><strong>Ühtegi nime ei leitud. Kas on õige rühm?</strong></div>';
+    if (!rep.P.length && !rep.H.length && !rep.partial.length && !rep.remarks.length && !rep.praises.length && !rep.cleared.length && rep.notInTahvel.length === data.students.length) h += '<div style="margin-top:3px;color:#A63C27"><strong>Ühtegi nime ei leitud. Kas on õige rühm?</strong></div>';
     return h;
   }
 

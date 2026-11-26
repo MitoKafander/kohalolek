@@ -127,6 +127,24 @@ await T.fill('#startAt', mid); await T.dispatchEvent('#startAt', 'change');
 await T.waitForFunction(() => [...document.querySelectorAll('button.st')].find(b => b.textContent.includes('Näidis Carl')).querySelector('.chip').textContent === 'H', null, { timeout: 8000 });
 ok(await chip('Näidis Aleksander') === '·', 'start 8 min back → H for scanned, waiting for no-show');
 await T.screenshot({ path: SHOTS + '/6-teacher-statuses.png' });
+// --- märkused ja kiitused ---
+await T.click('button[data-act=pane][data-pane=mark]');
+await T.waitForSelector('table.mx button.cell');
+const cell = (name, label) => T.locator(`table.mx tr:has(td.n:text-is("${name}")) td`).nth(1 + ['Telefon', 'Räägib', 'Segab', 'Magab', 'Klapid', 'Ei tööta', 'Tubli', 'Aitas'].indexOf(label)).locator('button.cell');
+await cell('Näidis Brita', 'Telefon').click(); await T.waitForFunction(() => !document.getElementById('toast').hidden);
+await cell('Näidis Brita', 'Telefon').click(); await T.waitForFunction(() => document.getElementById('toastMsg').textContent.includes('(2.)'));
+await cell('Näidis Carl', 'Tubli').click(); await T.waitForFunction(() => document.getElementById('toastMsg').textContent.includes('Carl'));
+await cell('Näidis Diana', 'Magab').click(); await T.waitForFunction(() => document.getElementById('toastMsg').textContent.includes('Diana'));
+await cell('Näidis Diana', 'Aitas').click(); await T.waitForFunction(() => document.getElementById('toastMsg').textContent.includes('aitas'));
+await cell('Näidis Aleksander', 'Segab').click(); await T.waitForFunction(() => document.getElementById('toastMsg').textContent.includes('Aleksander'));
+await T.click('#toastUndo');   // viimane märge tagasi
+await T.waitForFunction(() => document.getElementById('noteCount').textContent === '(5)', null, { timeout: 8000 });
+ok(await cell('Näidis Brita', 'Telefon').textContent() === '2' && await cell('Näidis Aleksander', 'Segab').textContent() === '+', 'notes: counts shown, undo removes the last one');
+ok(await cell('Näidis Carl', 'Tubli').getAttribute('class').then(c => c.includes('k1')), 'praise cells are styled as praise');
+const sent = await T.locator('#matrix .txt').allTextContents();
+ok(sent.length === 3 && /^Kasutas tunnis telefoni ilma õpetaja loata \(2 korda, kell \d\d\.\d\d, \d\d\.\d\d; ÕKE p 23\.4\.10\)\.$/.test(sent[0]) && sent[1] === 'Töötas tunnis keskendunult ja tegi ettenähtud töö ära.' && /^Magas tunnis \(kell \d\d\.\d\d; ÕKE p 23\.4\.20\)\. Aitas kaasõpilasi\.$/.test(sent[2]), 'sentences for Tahvel: ' + JSON.stringify(sent));
+await T.click('button[data-act=pane][data-pane=koh]'); await T.waitForSelector('#qr svg');
+ok((await T.textContent('button.st:has-text("Näidis Brita")')).includes('märkeid 2'), 'attendance list shows the note count');
 // uus kontroll: Carl skaneerib, Brita mitte
 await T.click('button[data-act=round]'); await T.click('button[data-act=round]');
 await T.waitForFunction(() => document.getElementById('roundLbl').textContent.includes('kontroll 2'));
@@ -145,6 +163,7 @@ const byName = Object.fromEntries(exp.students.map(s => [s.name, s]));
 ok(exp.kind === 'kohalolek' && exp.group === 'NÄIDIS-26' && exp.students.length === 4, 'export header');
 ok(exp.v === 2 && exp.entry.lessons === 1 && exp.entry.type === 'Tund' && exp.entry.cap.join() === 'Auditoorne õpe' && /^\d\d\.\d\d\.\d{4}$/.test(exp.entry.date) && exp.entry.startNr >= 1, 'export carries entry details: ' + JSON.stringify(exp.entry));
 ok(exp.students.every(s => Array.isArray(s.per) && s.per.length === 1), 'export has per-lesson statuses');
+ok(byName['Näidis Brita'].remarkKind === 'M' && byName['Näidis Brita'].remark.startsWith('Kasutas tunnis telefoni') && byName['Näidis Carl'].remarkKind === 'K' && byName['Näidis Diana'].remarkKind === 'M' && byName['Näidis Diana'].remark.endsWith('Aitas kaasõpilasi.') && byName['Näidis Aleksander'].remark === null, 'export carries remarks and praises');
 // Brita skaneeris alguses (hilinemisega), aga jäi 2. kontrollis skaneerimata → selle tunni eest P
 ok(byName['Näidis Aleksander'].status === 'P' && byName['Näidis Brita'].status === 'P' && byName['Näidis Carl'].status === 'H' && byName['Näidis Diana'].status === 'H', 'export statuses: ' + JSON.stringify(exp.students.map(s => s.status)));
 ok(byName['Näidis Brita'].tid === 102 && byName['Näidis Brita'].missed.join() === '2' && byName['Näidis Carl'].missed.length === 0, 'export keeps Tahvel id + missed rounds');
@@ -167,10 +186,19 @@ await T2.fill('#lPw', 'salajane-parool-1'); await T2.click('button[type=submit]'
 await T2.waitForSelector('button[data-act=edit-group]', { timeout: 20000 });
 await T2.click('button[data-act=edit-group]');
 ok((await T2.inputValue('#gNames')).includes('Näidis Diana'), 'second device decrypts roster after login');
+// tüüpide seaded: muuda ühes seadmes, teine näeb pärast sisselogimist
+await T2.click('button[data-act=home]'); await T2.waitForSelector('#ntTypes', { state: 'attached' });
+await T2.evaluate(() => { document.querySelector('details.card').open = true; });
+await T2.fill('#ntTypes', 'Telefon | kasutas tunnis telefoni ilma õpetaja loata | 23.4.10\nHilineb | tuli pausilt hilinemisega tundi\n+Tubli | töötas tunnis keskendunult');
+await T2.click('button[data-act=save-types]'); await T2.waitForSelector('.banner');
+ok((await T2.textContent('.banner')).includes('salvestatud'), 'note types saved');
+await T.click('button[data-act=home]'); await T.waitForSelector('#ntTypes', { state: 'attached' });
+ok((await T.inputValue('#ntTypes')).includes('Hilineb | tuli pausilt') && (await T.inputValue('#ntTypes')).split('\n').length === 3, 'note types reach the other device');
 // kaks õpetaja seadet samas tunnis: teises seadmes tehtud muudatused jõuavad esimesse
-await T.click('button[data-act=home]'); await T.waitForSelector('button[data-act=start]'); await T.click('button[data-act=start]');
+await T.waitForSelector('button[data-act=start]'); await T.click('button[data-act=start]');
 await T.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg'));
-await T2.click('button[data-act=home]'); await T2.waitForSelector('button[data-act=resume]'); await T2.click('button[data-act=resume]');
+// T2: rühmade leht uuesti, et näha käimasolevat tundi
+await T2.click('button[data-act=edit-group]'); await T2.click('button[data-act=home]'); await T2.waitForSelector('button[data-act=resume]'); await T2.click('button[data-act=resume]');
 await T2.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg'));
 await T2.check('input[data-cap="Iseseisev õpe"]'); await T2.focus('#mNr');   // teises seadmes on päises väli valitud
 await T.waitForTimeout(700);                                                  // inimese tempo: kaks seadet ei salvesta samal sekundimurdosal

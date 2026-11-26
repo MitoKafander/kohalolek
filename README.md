@@ -31,11 +31,22 @@ vormi, kus õpetaja selle üle vaatab ja ise salvestab.
    Skript täidab kande päise (liik, maht, kuupäev, algustund, tundide arv; ainult tühjad väljad) ja
    puudumised, vajadusel tunni kaupa (veerg „123?“).
 
+## Märkused ja kiitused
+
+Tunni vaates on teine vahekaart „Märkmed“: tabel õpilane × tüüp (Telefon, Räägib, Segab, Magab, Klapid,
+Ei tööta, Tubli, Aitas). Puudutus lisab märke kellaajaga; „Võta tagasi“ ja „Kustuta“ eemaldavad. Märgetest
+tehakse lause, nt „Kasutas tunnis telefoni ilma õpetaja loata (2 korda, kell 09.12, 09.40; ÕKE p 23.4.10).“,
+mis läheb koos kohalolekuga Tahvli kande selgituse lahtrisse linnukesega „Märkus“ või „Kiitus“. Kui õpilasel
+on samas tunnis nii märkus kui kiitus, lähevad mõlemad laused teksti ja linnuke on „Märkus“ (Tahvel lubab
+ainult ühe). Tüüpe ja lauseid saab muuta rühmade lehel („Märkuste ja kiituste tüübid“).
+
 ## Andmed ja privaatsus
 
 - Nimed krüpteeritakse õpetaja brauseris enne serverisse saatmist. Võti tuletatakse õpetaja paroolist
   ja serverisse ei jõua. Parooli ei saa taastada.
 - Server hoiab juhuslikke kohakoode, telefoni juhusliku seadmekoodi räsi ja skaneerimise kellaaegu.
+- Märkused ja kiitused (kes, mille eest) ning tüüpide laused on samuti krüpteeritud. Server näeb ainult
+  seda, mitu märget tunnis on ja millal need tehti.
 - Õpilase telefon saab oma rühma nimekirja lahti võtmega, mis on QR-koodis. Seega näeb rühma nimesid
   ainult see, kes on klassis ja koodi skannib.
 - Tahvlisse liiguvad andmed õpetaja lõikelaua kaudu. Skript Tahvlis midagi ise ei salvesta.

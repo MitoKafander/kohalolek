@@ -70,10 +70,30 @@ label.chk{display:inline-flex;gap:6px;align-items:center;font-size:14px;cursor:p
 .acts{display:flex;flex-wrap:wrap;gap:6px;padding:8px 4px 12px;border-bottom:1px solid var(--line)}
 .grp{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
 .hidden-names .n{filter:blur(7px)}
+.panes{display:inline-grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px}
+.panes button{font:inherit;font-size:14px;border:0;background:transparent;color:var(--muted);padding:7px 14px;border-radius:7px;cursor:pointer}
+.panes button[aria-current=true]{background:var(--accent);color:var(--accent-ink);font-weight:700}
+table.mx{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.mx th{position:sticky;top:0;z-index:2;background:var(--surface);font-size:11.5px;font-weight:700;color:var(--muted);padding:8px 2px;border-bottom:1px solid var(--line);text-align:center;line-height:1.15;word-break:break-word}
+.mx th:first-child{text-align:left;padding-left:6px}
+.mx th.pk{color:var(--accent)}
+.mx col.name{width:32%}
+.mx td{border-bottom:1px solid var(--line);padding:3px 2px;text-align:center}
+.mx tr:last-child td{border-bottom:0}
+.mx td.n{text-align:left;padding-left:6px;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell{width:100%;min-height:42px;border:1px dashed var(--line);border-radius:8px;background:transparent;color:var(--muted);font-size:16px;font-variant-numeric:tabular-nums;cursor:pointer;touch-action:manipulation}
+.cell.c1{border:1px solid transparent;background:var(--warm-soft);color:var(--warm);font-weight:700}
+.cell.c3{border:1px solid transparent;background:var(--crit-soft);color:var(--crit);font-weight:700}
+.cell.k1{border:1px solid transparent;background:var(--accent-soft);color:var(--accent);font-weight:700}
+.cell:active{transform:scale(.94)}
+.txt{white-space:pre-wrap;word-break:break-word;font-size:15px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:20;background:var(--ink);color:var(--bg);border-radius:10px;padding:10px 10px 10px 14px;display:flex;gap:12px;align-items:center;max-width:calc(100% - 32px);font-size:14px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.toast button{font:inherit;font-weight:700;font-size:14px;background:transparent;color:var(--bg);border:1px solid currentColor;border-radius:7px;padding:6px 10px;cursor:pointer;white-space:nowrap}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
+<div class="toast" id="toast" hidden><span id="toastMsg"></span><button id="toastUndo">Võta tagasi</button></div>
 <script src="../config.js"></script>
 <script src="../lib/qrcode.js"></script>
 <script src="../lib/common.js"></script>
@@ -94,6 +114,17 @@ const BELLS = {
 const CAMPUS = { K: 'Kesklinn', M: 'Mustamäe' };
 const ENTRY_TYPES = ['Tund', 'Praktiline töö', 'Iseseisev töö', 'E-õpe', 'Hindamine'];   // täpselt nagu Tahvli valikus
 const CAPS = ['Auditoorne õpe', 'Iseseisev õpe', 'Praktiline töö'];
+/* Märkuste (k: 'M') ja kiituste (k: 'K') tüübid. Tööruumi seadetes muudetavad; hoitakse serveris krüpteeritult. */
+const DEFAULT_TYPES = [
+  { id: 'tel', label: 'Telefon', text: 'kasutas tunnis telefoni ilma õpetaja loata', oke: '23.4.10', k: 'M' },
+  { id: 'rag', label: 'Räägib', text: 'rääkis tunnis kõrvalistel teemadel ega keskendunud tööle', oke: '', k: 'M' },
+  { id: 'seg', label: 'Segab', text: 'segas õppetöö läbiviimist ja kaasõpilaste tööd', oke: '23.4.1', k: 'M' },
+  { id: 'mag', label: 'Magab', text: 'magas tunnis', oke: '23.4.20', k: 'M' },
+  { id: 'kla', label: 'Klapid', text: 'kasutas tunnis kõrvaklappe ilma õpetaja loata', oke: '23.4.10', k: 'M' },
+  { id: 'too', label: 'Ei tööta', text: 'ei teinud tunnis ettenähtud tööd', oke: '', k: 'M' },
+  { id: 'tub', label: 'Tubli', text: 'töötas tunnis keskendunult ja tegi ettenähtud töö ära', oke: '', k: 'K' },
+  { id: 'abi', label: 'Aitas', text: 'aitas kaasõpilasi', oke: '', k: 'K' },
+];
 
 let A = null;            // {code, auth, enc, teacher}
 let G = [];              // rühmad koos lahti krüpteeritud nimekirjaga
@@ -102,7 +133,9 @@ let SS = null;           // käimasoleva/avatud tunni seis serverist
 let offset = 0;          // serveri kell miinus selle seadme kell
 let timers = [];
 let lastQrKey = '';
-const ui = { tab: 'login', msg: '', openSlot: null, hide: false, net: true, frame: '', hold: null };
+let NT = { types: DEFAULT_TYPES.map(t => ({ ...t })), oke: true };   // tööruumi seaded
+const noteCache = new Map();   // märke id → lahti krüpteeritud {s: koht, t: tüüp, at: aeg}
+const ui = { tab: 'login', msg: '', openSlot: null, hide: false, net: true, frame: '', hold: null, pane: 'koh' };
 try { ui.hide = localStorage.getItem('koh-hide') === '1'; } catch (e) {}
 
 /* ---------- abid ---------- */
@@ -183,6 +216,8 @@ const cleanName = n => n.replace(/^\s*\d+[.)]\s*/, '').replace(/\s+/g, ' ').trim
 /* ---------- sisselogimine ja rühmad ---------- */
 async function applyLogin(r) {
   offset = r.now - Date.now();
+  NT = { types: DEFAULT_TYPES.map(t => ({ ...t })), oke: true };
+  if (r.settings_enc) { try { const o = await KOH.decrypt(A.enc, r.settings_enc); if (o && Array.isArray(o.types) && o.types.length) NT = { types: o.types, oke: o.oke !== false }; } catch (e) {} }
   const out = [];
   for (const g of r.groups) {
     let roster;
@@ -259,7 +294,11 @@ async function doPoll() {
     const r = await rpc('koh_session_state', { ...cred(), p_session: id });
     ui.net = true;
     if (V.view !== 'session' || V.id !== id) return;      // vahepeal lahkuti sellest tunnist
-    if (r.ok) { offset = r.now - Date.now(); SS = r; } else if (r.err === 'auth') { logout(); }
+    if (r.ok) {
+      for (const n of r.notes || []) if (!noteCache.has(n.id)) { try { noteCache.set(n.id, await KOH.decrypt(A.enc, n.blob)); } catch (e) { noteCache.set(n.id, null); } }
+      if (V.view !== 'session' || V.id !== id) return;
+      offset = r.now - Date.now(); SS = r;
+    } else if (r.err === 'auth') { logout(); }
   } catch (e) { ui.net = false; }
 }
 /* Mille järgi on tunni vaate raam joonistatud. Kui see muutub (tund lõpetati, uus kontroll või lisaandmed
@@ -280,6 +319,66 @@ function syncHeader() {
   const n = document.getElementById('ttNote'); if (n) n.textContent = M.tt ? '· tunniplaanist: ' + M.tt : '';
 }
 /* Iga õpilase staatus: käsitsi parandus või skaneerimise aja järgi. */
+/* ---------- märkused ja kiitused ---------- */
+const notes = () => (SS.notes || []).map(n => { const o = noteCache.get(n.id); return o ? { id: n.id, ...o } : null; }).filter(Boolean);
+const typeOf = id => NT.types.find(t => t.id === id) || null;
+const fT = t => hm(t).replace(':', '.');
+const cap1 = x => x.charAt(0).toUpperCase() + x.slice(1);
+/* Ühe õpilase selle tunni märkmed lausena Tahvli jaoks. kind: M, kui on vähemalt üks märkus, muidu K (kiitus). */
+function noteText(slot, all) {
+  const evs = (all || notes()).filter(n => n.s === slot); if (!evs.length) return null;
+  const M = [], K = [];
+  for (const ty of NT.types) {
+    const list = evs.filter(e => e.t === ty.id).sort((a, b) => a.at - b.at); if (!list.length) continue;
+    if (ty.k === 'K') { K.push(cap1(ty.text) + (list.length > 1 ? ` (${list.length} korda).` : '.')); continue; }
+    let inner = list.length > 1 ? `${list.length} korda, kell ${list.map(e => fT(e.at)).join(', ')}` : `kell ${fT(list[0].at)}`;
+    if (NT.oke && ty.oke) inner += `; ÕKE p ${ty.oke}`;
+    M.push(cap1(ty.text) + ` (${inner}).`);
+  }
+  const text = M.concat(K).join(' ');
+  return text ? { text, kind: M.length ? 'M' : 'K' } : null;
+}
+let toastTimer = null;
+function toast(msg, undo) {
+  const el = document.getElementById('toast'), bt = document.getElementById('toastUndo');
+  document.getElementById('toastMsg').textContent = msg; bt.hidden = !undo; bt.onclick = undo ? async () => { el.hidden = true; await undo(); } : null;
+  el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 5000);
+}
+async function addNote(slot, typeId) {
+  const obj = { s: slot, t: typeId, at: now() };
+  const blob = await KOH.encrypt(A.enc, obj);
+  const r = await rpc('koh_note_add', { ...cred(), p_session: V.id, p_blob: blob });
+  if (!r.ok) { toast('Märget ei saanud salvestada.'); return; }
+  noteCache.set(r.id, obj); (SS.notes = SS.notes || []).push({ id: r.id, blob });
+  const stu = group(SS.session.group_id).roster.students.find(x => x.slot === slot), ty = typeOf(typeId);
+  const c = notes().filter(n => n.s === slot && n.t === typeId).length;
+  updateSession();
+  toast(`${stu ? stu.name : '?'}: ${ty ? ty.label.toLowerCase() : '?'} (${c}.) kell ${fT(obj.at)}`, () => delNote(r.id));
+}
+async function delNote(id) {
+  await rpc('koh_note_del', { ...cred(), p_session: V.id, p_id: id });
+  if (SS && SS.notes) SS.notes = SS.notes.filter(n => n.id !== id);
+  updateSession();
+}
+/* Märkmete vaade: õpilane × tüüp, puudutus lisab märke kellaajaga. Lõppenud tunnil ka valmis laused. */
+function updateNotes() {
+  const box = document.getElementById('matrix'); if (!box) return;
+  if (SS.notes === undefined) { box.innerHTML = '<div class="banner">Märkmete jaoks on vaja serveri uuendust. Käivita Supabase\'i SQL Editoris viimane SQL.</div>'; return; }
+  const g = group(SS.session.group_id), ns = notes(), cnt = {};
+  ns.forEach(n => { cnt[n.s + '|' + n.t] = (cnt[n.s + '|' + n.t] || 0) + 1; });
+  const head = `<colgroup><col class="name">${NT.types.map(() => '<col>').join('')}</colgroup><thead><tr><th scope="col">Õpilane</th>${NT.types.map(t => `<th scope="col" class="${t.k === 'K' ? 'pk' : ''}">${esc(t.label)}</th>`).join('')}</tr></thead>`;
+  const rows = g.roster.students.map(stu => `<tr><td class="n" title="${esc(stu.name)}">${esc(stu.name)}</td>${NT.types.map(t => { const c = cnt[stu.slot + '|' + t.id] || 0;
+    return `<td><button class="cell ${!c ? '' : t.k === 'K' ? 'k1' : c >= 3 ? 'c3' : 'c1'}" data-act="note" data-slot="${esc(stu.slot)}" data-type="${esc(t.id)}" aria-label="${esc(stu.name)}: ${esc(t.label)}, ${c}">${c || '+'}</button></td>`; }).join('')}</tr>`).join('');
+  const nameOf = slot => (g.roster.students.find(x => x.slot === slot) || {}).name || '?';
+  const recent = ns.slice().sort((a, b) => b.at - a.at).slice(0, 8).map(n => `<div class="row between" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="n"><span class="mono small muted">${fT(n.at)}</span> ${esc(nameOf(n.s))}: ${esc((typeOf(n.t) || { label: '?' }).label.toLowerCase())}</span><button class="btn" data-act="note-del" data-id="${esc(n.id)}">Kustuta</button></div>`).join('');
+  const texts = g.roster.students.map(stu => ({ stu, nt: noteText(stu.slot, ns) })).filter(x => x.nt);
+  box.className = ui.hide ? 'hidden-names' : '';
+  box.innerHTML = `<table class="mx">${head}<tbody>${rows}</tbody></table>
+    <p class="small muted" style="margin:8px 0 0">Puuduta lahtrit ja märge salvestub kellaajaga. Rohelised veerud on kiitused. Laused lähevad koos kohalolekuga Tahvli kandesse („Kopeeri Tahvli jaoks“).</p>
+    ${recent ? `<h2 style="margin-top:14px">Viimased märked</h2><div class="list">${recent}</div>` : ''}
+    ${texts.length ? `<h2 style="margin-top:14px">Laused Tahvlisse</h2>${texts.map(x => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div class="row between"><strong class="n">${esc(x.stu.name)}</strong><span class="row"><span class="tag${x.nt.kind === 'M' ? ' crit' : ''}">${x.nt.kind === 'M' ? 'märkus' : 'kiitus'}</span><button class="btn" data-act="note-copy" data-slot="${esc(x.stu.slot)}">Kopeeri</button></span></div><div class="txt">${esc(x.nt.text)}</div></div>`).join('')}` : ''}`;
+}
+
 /* Tunni lisaandmed: algustund, tundide arv, Tahvli kande liik ja maht. Server hoiab, kohalik koopia on varuks. */
 function metaOf() {
   const s = SS.session, g = group(s.group_id), d = groupDefaults(g.id);
@@ -350,13 +449,13 @@ function statuses() {
   });
 }
 function exportTahvel() {
-  const s = SS.session, g = group(s.group_id), d = new Date(s.start_at), M = metaOf();
+  const s = SS.session, g = group(s.group_id), d = new Date(s.start_at), M = metaOf(), ns = notes();
   return JSON.stringify({
     v: 2, kind: 'kohalolek', group: g.label,
     date: d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()), start: hm(s.start_at),
     entry: { date: dmy(s.start_at), startNr: M.nr, lessons: M.n, type: M.type || null, cap: M.cap },
     // status „P“ ka osalise puudumise korral, et vanem skript ei jätaks kedagi ekslikult kohalolijaks; täpne jaotus on väljal per
-    students: statuses().map(x => ({ name: x.name, tid: x.tid || null, status: x.st === 'W' || x.st === 'O' ? 'P' : x.st, per: x.per, min: x.late, missed: x.missed })),
+    students: statuses().map(x => { const nt = noteText(x.slot, ns); return { name: x.name, tid: x.tid || null, status: x.st === 'W' || x.st === 'O' ? 'P' : x.st, per: x.per, min: x.late, missed: x.missed, remark: nt ? nt.text : null, remarkKind: nt ? nt.kind : null }; }),
   });
 }
 const perText = (x, nr) => x.per.map((p, i) => p === 'K' ? null : `${nr + i}. tund ${p}`).filter(Boolean).join(', ');
@@ -367,6 +466,8 @@ function exportText() {
     `Puudus (${P.length}): ${P.map(x => x.name).join(', ') || '–'}`,
     `Hilines (${H.length}): ${H.map(x => x.name + (x.late != null && !x.manual ? ` (+${x.late} min)` : '')).join(', ') || '–'}`];
   if (O.length) lines.push(`Osaliselt puudus (${O.length}): ${O.map(x => `${x.name} (${perText(x, M.nr)})`).join('; ')}`);
+  const ns = notes(), nl = st.map(x => ({ x, nt: noteText(x.slot, ns) })).filter(y => y.nt);
+  if (nl.length) lines.push('', 'Märkused ja kiitused:', ...nl.map(y => `${y.x.name}: ${y.nt.text}`));
   return lines.join('\n');
 }
 
@@ -404,6 +505,11 @@ function vHome() {
   ${ui.msg ? `<div class="banner">${esc(ui.msg)}</div>` : ''}
   ${cards || '<div class="card"><p class="muted" style="margin:0">Rühmi pole veel. Lisa esimene rühm või impordi nimekirjad.</p></div>'}
   <div class="row"><button class="btn primary" data-act="new-group">Uus rühm</button><label class="btn" for="impFile">Impordi fail</label><input type="file" id="impFile" accept=".json,application/json,text/plain" hidden></div>
+  <details class="card"><summary><strong>Märkuste ja kiituste tüübid</strong> <span class="small muted">(veerud ja Tahvli laused)</span></summary>
+    <p class="small muted" style="margin:0">Iga rida: veeru nimi | lause Tahvlisse | ÕKE punkt (võib tühjaks jätta). Kiituse rida algab plussiga, nt „+Tubli | töötas tunnis keskendunult“. Telefoni ekraanile mahub hästi kuni 8 veergu.</p>
+    <textarea id="ntTypes" rows="9">${esc(NT.types.map(t => (t.k === 'K' ? '+' : '') + [t.label, t.text, t.oke].join(' | ')).join('\n'))}</textarea>
+    <label class="chk"><input type="checkbox" id="ntOke"${NT.oke ? ' checked' : ''}> Lisa märkuse lausesse ÕKE punkt</label>
+    <div class="row"><button class="btn primary" data-act="save-types">Salvesta tüübid</button><button class="btn" data-act="reset-types">Taasta vaikimisi</button></div></details>
   <p class="small muted" style="margin:0">Nimed krüpteeritakse selles seadmes enne serverisse saatmist. Server näeb ainult juhuslikke koode ja kellaaegu.</p>`;
 }
 function vGroup() {
@@ -442,7 +548,10 @@ function vSession() {
     ${CAPS.map(x => `<label class="chk"><input type="checkbox" data-cap="${x}"${M.cap.includes(x) ? ' checked' : ''}> ${x.toLowerCase()}</label>`).join('')}
     <span id="ttNote">${M.tt ? '· tunniplaanist: ' + esc(M.tt) : ''}</span>
   </div>
+  <div class="row between"><div class="panes"><button data-act="pane" data-pane="koh" aria-current="${ui.pane !== 'mark'}">Kohalolek</button><button data-act="pane" data-pane="mark" aria-current="${ui.pane === 'mark'}">Märkmed <span id="noteCount"></span></button></div>
+    ${ui.pane === 'mark' ? `<label class="chk"><input type="checkbox" id="hideNames"${ui.hide ? ' checked' : ''}> Peida nimed</label>` : ''}</div>
   <div id="net"></div>
+  ${ui.pane === 'mark' ? `<section class="card"><div id="matrix"></div>${ended ? `<div class="row"><button class="btn primary" data-act="copy-tahvel">Kopeeri Tahvli jaoks</button><button class="btn" data-act="copy-text">Kopeeri tekstina</button></div>` : ''}</section>` : `
   <div class="split">
     <section class="card qrpane" id="qrpane">
       ${ended ? `<h2>Tund on lõpetatud</h2>` : `<div id="qr"></div><div class="small muted">Ava telefoni kaamera ja skanni kood · <span class="mono" id="clock"></span><span id="roundLbl"></span></div>`}
@@ -459,18 +568,21 @@ function vSession() {
       <div class="list" id="list"></div>
       <p class="small muted" style="margin:0">K = kohal, H = hilines (alla 15 min), P = puudub (15 min või rohkem, ÕKE p 9.8), osa = puudus osa tunde. Mitme tunni korral arvestatakse iga tundi eraldi. Puuduta nime, et staatust käsitsi muuta.</p>
     </section>
-  </div>`;
+  </div>`}`;
 }
 /* Uuendab ainult muutuvaid osi, et sisestusväljad ja kerimine paigale jääksid. */
 function updateSession() {
-  if (V.view !== 'session' || !SS || !document.getElementById('list')) return;
-  const s = SS.session, st = statuses(), total = st.length;
+  if (V.view !== 'session' || !SS || !document.getElementById('net')) return;
+  const s = SS.session, st = statuses(), total = st.length, ns = notes();
   syncHeader();
+  const nc = document.getElementById('noteCount'); if (nc) nc.textContent = ns.length ? `(${ns.length})` : '';
+  document.getElementById('net').innerHTML = ui.net ? '' : '<div class="banner crit">Ühendus serveriga katkes. Proovin uuesti.</div>';
+  if (ui.pane === 'mark') { updateNotes(); return; }
+  if (!document.getElementById('list')) return;
   const c = { K: 0, H: 0, P: 0, W: 0, O: 0 }; st.forEach(x => c[x.st]++);
   document.getElementById('count').textContent = `Kohal ${c.K + c.H + c.O} / ${total}`;
   document.getElementById('stats').innerHTML = `<span>Hilines <strong>${c.H}</strong></span>${c.O ? `<span>Osaliselt <strong>${c.O}</strong></span>` : ''}<span>Puudub <strong>${c.P}</strong></span>${c.W ? `<span>Ootel <strong>${c.W}</strong></span>` : ''}${SS.picking ? `<span>Valib nime <strong>${SS.picking}</strong></span>` : ''}`;
   const rl = document.getElementById('roundLbl'); if (rl) rl.textContent = s.round > 1 ? ` · kontroll ${s.round}` : '';
-  document.getElementById('net').innerHTML = ui.net ? '' : '<div class="banner crit">Ühendus serveriga katkes. Proovin uuesti.</div>';
   const nameOf = slot => (st.find(x => x.slot === slot) || {}).name || '?';
   const nr0 = metaOf().nr;
   document.getElementById('claims').innerHTML = SS.claims.map(cl => `<div class="banner row between"><span><strong>${esc(nameOf(cl.slot))}</strong>: uus telefon tahab selle nimega siduda (${hm(cl.at)}).</span><span class="row"><button class="btn primary" data-act="claim" data-device="${esc(cl.device)}" data-ok="1">Luba</button><button class="btn" data-act="claim" data-device="${esc(cl.device)}" data-ok="0">Keela</button></span></div>`).join('');
@@ -480,7 +592,7 @@ function updateSession() {
     let d = x.manual ? 'käsitsi' : x.at ? (x.st === 'K' ? hm(x.at) : `${x.st === 'H' ? '' : 'saabus '}${hm(x.at)}${x.late ? ` (+${x.late} min)` : ''}`) : (x.st === 'W' ? 'ootel' : '');
     if (x.manual && x.at) d += ` · ${hm(x.at)}`;
     const strip = x.per.length > 1 && x.st !== 'K' && x.st !== 'W' ? `<span class="strip">${x.per.map((p, i) => `<span class="mini ${p}" title="${nr0 + i}. tund">${p}</span>`).join('')}</span>` : '';
-    const row = `<button class="st" data-act="open" data-slot="${esc(x.slot)}"><span class="chip ${x.st}">${lbl[x.st]}</span><span class="n">${esc(x.name)}${x.fresh ? '<span class="tag">uus sidumine</span>' : ''}${x.missed.length ? `<span class="tag crit">puudus kontrollis ${x.missed.join(', ')}</span>` : ''}</span><span class="d mono">${strip}${esc(d)}</span></button>`;
+    const row = `<button class="st" data-act="open" data-slot="${esc(x.slot)}"><span class="chip ${x.st}">${lbl[x.st]}</span><span class="n">${esc(x.name)}${x.fresh ? '<span class="tag">uus sidumine</span>' : ''}${x.missed.length ? `<span class="tag crit">puudus kontrollis ${x.missed.join(', ')}</span>` : ''}${ns.some(n => n.s === x.slot) ? `<span class="tag" style="background:var(--line);color:var(--ink)">märkeid ${ns.filter(n => n.s === x.slot).length}</span>` : ''}</span><span class="d mono">${strip}${esc(d)}</span></button>`;
     if (ui.openSlot !== x.slot) return row;
     return row + `<div class="acts">${['K', 'H', 'P'].map(v => `<button class="btn${x.manual && x.st === v ? ' primary' : ''}" data-act="mark" data-slot="${esc(x.slot)}" data-st="${v}">${{ K: 'Kohal', H: 'Hilines', P: 'Puudub' }[v]}</button>`).join('')}<button class="btn" data-act="mark" data-slot="${esc(x.slot)}" data-st="">Automaatne</button>${x.bound ? `<button class="btn danger" data-act="unbind" data-slot="${esc(x.slot)}">Eemalda telefoni sidumine</button>` : ''}</div>`;
   }).join('');
@@ -496,7 +608,7 @@ async function updateQr() {
   const el = document.getElementById('qr'); if (el) { el.innerHTML = qrSvg(url); window.__kohUrl = url; }
 }
 async function openSession(id) {
-  stopTimers(); V = { view: 'session', id }; SS = null; ui.openSlot = null; lastQrKey = '';
+  stopTimers(); V = { view: 'session', id }; SS = null; ui.openSlot = null; lastQrKey = ''; noteCache.clear();
   render(); await poll();
   if (!SS) { V = { view: 'home' }; ui.msg = 'Tundi ei saanud avada.'; render(); return; }
   render(); updateQr();
@@ -572,6 +684,23 @@ document.addEventListener('click', async ev => {
     else if (a === 'history') {
       const r = await rpc('koh_sessions', { ...cred(), p_group: b.dataset.id });
       V = { view: 'history', id: b.dataset.id, sessions: r.sessions || [] }; render();
+    }
+    else if (a === 'pane') { ui.pane = b.dataset.pane; render(); if (ui.pane !== 'mark') { lastQrKey = ''; updateQr(); } }
+    else if (a === 'note') { b.disabled = true; await addNote(b.dataset.slot, b.dataset.type); }
+    else if (a === 'note-del') { if (!armed(b)) return; await delNote(b.dataset.id); }
+    else if (a === 'note-copy') { const nt = noteText(b.dataset.slot); if (nt) copyText(nt.text, b); }
+    else if (a === 'save-types' || a === 'reset-types') {
+      if (a === 'reset-types' && !armed(b)) return;
+      const types = a === 'reset-types' ? DEFAULT_TYPES.map(t => ({ ...t })) : document.getElementById('ntTypes').value.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+        const k = l.startsWith('+') ? 'K' : 'M', p = l.replace(/^\+/, '').split('|').map(x => x.trim()); if (!p[0]) return null;
+        const ex = NT.types.find(t => t.label === p[0]);
+        return { id: ex ? ex.id : Math.random().toString(36).slice(2, 7), label: p[0].slice(0, 20), text: (p[1] || p[0].toLowerCase()).slice(0, 300), oke: (p[2] || '').slice(0, 20), k };
+      }).filter(Boolean).slice(0, 14);
+      if (!types.length) return;
+      const next = { types, oke: a === 'reset-types' ? true : document.getElementById('ntOke').checked };
+      let r = null; try { r = await rpc('koh_ws_settings', { ...cred(), p_settings: await KOH.encrypt(A.enc, next) }); } catch (e) {}
+      if (r && r.ok) { NT = next; ui.msg = 'Tüübid salvestatud.'; } else ui.msg = 'Tüüpe ei saanud salvestada (serveri uuendus tegemata?).';
+      render();
     }
     else if (a === 'open') { ui.openSlot = ui.openSlot === b.dataset.slot ? null : b.dataset.slot; updateSession(); }
     else if (a === 'mark') { await act('koh_mark', { p_session: V.id, p_slot: b.dataset.slot, p_status: b.dataset.st || null }); ui.openSlot = null; updateSession(); }

@@ -46,5 +46,23 @@ const v = await p.evaluate(async () => {
 });
 ok(v.excused.join() === 'Näidis Tõendiga' && v.P.join() === 'Näidis Tavaline' && v.skipped.length === 0, 'P turned into V by Tahvel is reported as excused, not as a failure: ' + JSON.stringify(v));
 ok(v.second.skipped === 1 && v.second.P.join() === 'Näidis Tavaline', 'second paste leaves the existing V alone: ' + JSON.stringify(v.second));
+// 7) märkus ja kiitus: tekst selgituse lahtrisse, õige linnuke
+const pr = await p.evaluate(async () => {
+  const cb = name => `<checkbox formcontrolname="${name}"><button type="button" class="c-button"><div class="box"></div></button></checkbox>`;
+  const row = name => `<tr><td>1</td><td><div class="student-cell"><span><span>${name}</span><span>, G</span></span></div></td><td>${cb('isLessonAbsence')}</td><td><div><div class="checkbox-row">${cb('absenceLate')}${cb('absenceWithoutReason')}</div></div></td><td></td><td></td><td><tahvel-textarea formcontrolname="description"><textarea maxlength="1000"></textarea></tahvel-textarea></td><td>${cb('praise')}</td><td>${cb('remark')}</td></tr>`;
+  document.getElementById('app').innerHTML = `<add-entry><table class="tahvel-table"><tbody>${row('Näidis Kiidetud')}${row('Näidis Märkusega')}${row('Näidis Tavaline')}</tbody></table></add-entry>`;
+  const dialog = document.querySelector('add-entry');
+  dialog.addEventListener('click', ev => { const b = ev.target.closest('checkbox button'); if (b) b.querySelector('.box').classList.toggle('checked'); });
+  const data = window.__kohTahvel.parse(JSON.stringify({ v: 2, kind: 'kohalolek', group: 'G', students: [
+    { name: 'Näidis Kiidetud', status: 'K', per: ['K'], remark: 'Aitas kaasõpilasi.', remarkKind: 'K' },
+    { name: 'Näidis Märkusega', status: 'H', per: ['H'], remark: 'Magas tunnis (kell 09.12; ÕKE p 23.4.20).', remarkKind: 'M' },
+    { name: 'Näidis Tavaline', status: 'K', per: ['K'], remark: null, remarkKind: null }] }));
+  const rep = await window.__kohTahvel.apply(dialog, data);
+  const st = i => { const tr = dialog.querySelectorAll('tbody tr')[i]; const on = n => !!tr.querySelector(`checkbox[formcontrolname="${n}"] .box.checked`); return { text: tr.querySelector('textarea').value, praise: on('praise'), remark: on('remark'), H: on('absenceLate') }; };
+  return { rep: { praises: rep.praises, remarks: rep.remarks, H: rep.H }, r0: st(0), r1: st(1), r2: st(2) };
+});
+ok(pr.r0.praise && !pr.r0.remark && pr.r0.text === 'Aitas kaasõpilasi.' && pr.rep.praises.join() === 'Näidis Kiidetud', 'praise → text + Kiitus checkbox: ' + JSON.stringify(pr.r0));
+ok(pr.r1.remark && !pr.r1.praise && pr.r1.H && pr.r1.text.startsWith('Magas tunnis') && pr.rep.remarks.join() === 'Näidis Märkusega', 'remark → text + Märkus checkbox, attendance still set: ' + JSON.stringify(pr.r1));
+ok(!pr.r2.praise && !pr.r2.remark && pr.r2.text === '', 'student without notes untouched');
 console.log(`userscript DOM: ${pass} passed, ${fail} failed` + (errs.length ? ' | errors: ' + errs.join('; ') : ''));
 await b.close(); process.exit(fail || errs.length ? 1 : 0);

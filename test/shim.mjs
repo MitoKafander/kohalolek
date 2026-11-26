@@ -7,7 +7,8 @@ import path from 'node:path';
 export async function startShim({ siteDir, migration, port = 8791 }) {
   const db = new PGlite();
   await db.exec('create role anon; create role authenticated;');
-  await db.exec(fs.readFileSync(migration, 'utf8'));
+  const dir = path.dirname(migration);
+  for (const m of fs.readdirSync(dir).filter(x => x.endsWith('.sql')).sort()) await db.exec(fs.readFileSync(path.join(dir, m), 'utf8'));
   const sigs = {};
   const rows = (await db.query(`select p.proname, p.proargnames, p.proargtypes::regtype[]::text[] as types from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'koh_%'`)).rows;
   for (const r of rows) sigs[r.proname] = { names: r.proargnames || [], types: r.types || [] };

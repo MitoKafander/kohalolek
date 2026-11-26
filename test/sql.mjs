@@ -87,6 +87,11 @@ ok((await rpc('koh_ws_login', C)).groups[0].label === 'G1', 'other workspace can
 await rpc('koh_session_end', { ...C, p_session: ss.id, p_end: true });
 ok((await rpc('koh_checkin', { p_session: ss.id, p_token: tok(2), p_device: D3 })).status === 'ended', 'ended session rejects');
 ok((await rpc('koh_sessions', { ...C, p_group: gs.id })).sessions.length === 1, 'history lists session');
+// tunni lisaandmed
+ok((await rpc('koh_session_meta', { ...C, p_session: ss.id, p_meta: { nr: 3, n: 4, type: 'Tund', cap: ['A'] } })).ok === true, 'meta saved');
+ok((await rpc('koh_session_state', { ...C, p_session: ss.id })).session.meta.n === 4, 'meta returned in state');
+ok((await rpc('koh_session_meta', { ...O, p_session: ss.id, p_meta: { n: 9 } })).err === 'notfound', 'other workspace cannot set meta');
+ok((await rpc('koh_session_meta', { ...C, p_session: ss.id, p_meta: { x: 'y'.repeat(3000) } })).err === 'size', 'oversized meta rejected');
 // slot removal drops binding
 await rpc('koh_group_save', { ...C, p_id: gs.id, p_label: 'G1', p_roster_enc: 'r', p_list_enc: 'l', p_slots: ['bbbb', 'cccc'] });
 ok((await rpc('koh_ws_login', C)).groups[0].bound.length === 0, 'removed slot → binding gone');

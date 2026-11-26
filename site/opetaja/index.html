@@ -27,11 +27,11 @@ h2{font-size:17px;margin:0}
 .btn.danger{color:var(--crit);border-color:var(--crit)}
 .btn[data-armed="1"]{background:var(--crit);border-color:var(--crit);color:var(--surface)}
 .btn:disabled{opacity:.5;cursor:default}
-input[type=text],input[type=password],input[type=time],input[type=number],textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+input[type=text],input[type=password],input[type=time],input[type=number],textarea,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
 input[type=number]{width:64px}
 textarea{width:100%;resize:vertical;line-height:1.4}
 label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
-label.f input{font-size:16px}
+label.f input,label.f select{font-size:16px}
 label.chk{display:inline-flex;gap:6px;align-items:center;font-size:14px;cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .banner{background:var(--warm-soft);border-radius:10px;padding:10px 12px;font-size:14px}
@@ -59,6 +59,10 @@ label.chk{display:inline-flex;gap:6px;align-items:center;font-size:14px;cursor:p
 .chip.H{background:var(--warm-soft);color:var(--warm)}
 .chip.P{background:var(--crit-soft);color:var(--crit)}
 .chip.W{border:1px dashed var(--line);color:var(--muted)}
+.chip.O{background:var(--warm-soft);color:var(--crit);font-size:12px}
+.strip{display:inline-flex;gap:2px;margin-right:8px;vertical-align:-2px}
+.mini{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;font-size:11px;font-weight:700}
+.mini.K{background:var(--accent-soft);color:var(--accent)}.mini.H{background:var(--warm-soft);color:var(--warm)}.mini.P{background:var(--crit-soft);color:var(--crit)}
 .st .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .st .d{font-size:13px;color:var(--muted);text-align:right;white-space:nowrap}
 .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:5px;padding:1px 5px;margin-left:6px;background:var(--warm-soft);color:var(--warm);vertical-align:1px}
@@ -81,6 +85,15 @@ const LS = 'koh-auth';
 const ROOT = new URL('../', location.href).href;
 const LATE_MS = 15 * 60000;   // ÕKE p 9.8: alla 15 min = hilinemine, 15 min või rohkem = puudumine
 const ROUND_GRACE_MS = 3 * 60000;
+const LESSON_MS = 45 * 60000;
+/* Tundide algusajad (allikas: kooli EduPage'i kellad, november 2026). */
+const BELLS = {
+  K: ['08:30', '09:15', '10:15', '11:00', '12:45', '13:30', '14:30', '15:15', '16:15', '17:00', '18:00', '18:45', '19:45', '20:30'],
+  M: ['08:30', '09:15', '10:15', '11:00', '12:00', '12:45', '13:45', '14:30', '15:30', '16:15', '17:15', '18:00', '19:00', '19:45'],
+};
+const CAMPUS = { K: 'Kesklinn', M: 'Mustamäe' };
+const ENTRY_TYPES = ['Tund', 'Praktiline töö', 'Iseseisev töö', 'E-õpe', 'Hindamine'];   // täpselt nagu Tahvli valikus
+const CAPS = ['Auditoorne õpe', 'Iseseisev õpe', 'Praktiline töö'];
 
 let A = null;            // {code, auth, enc, teacher}
 let G = [];              // rühmad koos lahti krüpteeritud nimekirjaga
@@ -118,6 +131,15 @@ function copyText(text, btn) {
 }
 function qrSvg(text) { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ scalable: true, margin: 2 }); }
 function newSlot(used) { for (;;) { const s = Math.random().toString(36).slice(2, 6).padEnd(4, '0'); if (!used.has(s)) { used.add(s); return s; } } }
+const guessCampus = label => /^\s*M/i.test(label) ? 'M' : 'K';
+const campusOf = g => (g.roster.campus in BELLS ? g.roster.campus : guessCampus(g.label));
+/* Rühma tunnikellad sessiooni kuupäeval (ms). */
+function bellTimes(g, dayTs) {
+  return BELLS[campusOf(g)].map(t => { const [h, m] = t.split(':').map(Number); const x = new Date(dayTs); x.setHours(h, m, 0, 0); return x.getTime(); });
+}
+/* Mitmes tund kell `ts` käib või kohe algab (kuni 10 min enne kella loetakse juba järgmiseks). */
+function guessNr(g, ts) { let k = 0; bellTimes(g, ts).forEach((b, i) => { if (b <= ts + 10 * 60000) k = i; }); return k + 1; }
+const groupDefaults = gid => { try { return JSON.parse(localStorage.getItem('koh-def-' + gid) || '{}'); } catch (e) { return {}; } };
 const cleanName = n => n.replace(/^\s*\d+[.)]\s*/, '').replace(/\s+/g, ' ').trim();
 
 /* ---------- sisselogimine ja rühmad ---------- */
@@ -141,7 +163,7 @@ function logout() {
   try { localStorage.removeItem(LS); sessionStorage.removeItem(LS); } catch (e) {}
   V = { view: 'login' }; render();
 }
-async function saveGroup(existing, label, names, tids) {
+async function saveGroup(existing, label, names, tids, campus) {
   const old = existing ? existing.roster.students : [];
   const used = new Set(old.map(s => s.slot));
   const seen = new Set();
@@ -155,7 +177,7 @@ async function saveGroup(existing, label, names, tids) {
   const kg = (existing && existing.roster.kg) || KOH.randomKey(16);
   const r = await rpc('koh_group_save', {
     ...cred(), p_id: existing ? existing.id : null, p_label: label,
-    p_roster_enc: await KOH.encrypt(A.enc, { kg, students }),
+    p_roster_enc: await KOH.encrypt(A.enc, { kg, students, campus: campus || (existing && existing.roster.campus) || guessCampus(label) }),
     p_list_enc: await KOH.encrypt(kg, students.map(s => [s.slot, s.name]).sort((a, b) => a[1].localeCompare(b[1], 'et'))),
     p_slots: students.map(s => s.slot),
   });
@@ -194,42 +216,86 @@ async function poll() {
   ui.busy = false;
 }
 /* Iga õpilase staatus: käsitsi parandus või skaneerimise aja järgi. */
+/* Tunni lisaandmed: algustund, tundide arv, Tahvli kande liik ja maht. Server hoiab, kohalik koopia on varuks. */
+function metaOf() {
+  const s = SS.session, g = group(s.group_id), d = groupDefaults(g.id);
+  let local = {}; try { local = JSON.parse(localStorage.getItem('koh-meta-' + s.id) || '{}'); } catch (e) {}
+  const m = Object.assign({}, local, s.meta || {});
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  return { nr: clamp(+m.nr || guessNr(g, s.start_at), 1, BELLS.K.length), n: clamp(+m.n || +d.n || 2, 1, 12),
+    type: typeof m.type === 'string' ? m.type : (d.type || ''), cap: Array.isArray(m.cap) ? m.cap : (d.cap || []) };
+}
+async function saveMeta(patch) {
+  const s = SS.session, m = { ...metaOf(), ...patch };
+  s.meta = m;
+  try { localStorage.setItem('koh-meta-' + s.id, JSON.stringify(m)); localStorage.setItem('koh-def-' + s.group_id, JSON.stringify({ n: m.n, type: m.type, cap: m.cap })); } catch (e) {}
+  try { await rpc('koh_session_meta', { ...cred(), p_session: s.id, p_meta: m }); } catch (e) { /* vanem server: jääb kohalikuks */ }
+}
+/* Iga tunni algusaeg: esimene = „Tund algas“, järgmised kooli kellade järgi. */
+function lessonRefs(g, s, M) {
+  const b = bellTimes(g, s.start_at), out = [s.start_at];
+  for (let i = 1; i < M.n; i++) { const k = M.nr - 1 + i; out.push(k < b.length ? b[k] : out[i - 1] + LESSON_MS); }
+  for (let i = 1; i < out.length; i++) if (out[i] <= out[i - 1]) out[i] = out[i - 1] + LESSON_MS;
+  return out;
+}
+/* Ühe õpilase staatus iga tunni kohta (puhas funktsioon, testitav).
+ * refs = tundide algused (ms), on = õigeaegsuse varu (ms), scans = [{at, r}] aja järjekorras,
+ * rounds = hilisemad kontrollid [{n, at, closed}]. ÕKE p 9.8: alla 15 min hiljem = H, muidu P.
+ * Kontrollis skaneerimata jäänu loetakse sellest tunnist alates puudujaks, kuni ta uuesti skaneerib. */
+function calcPer(refs, on, scans, rounds) {
+  if (!scans.length) return { per: refs.map(() => 'P'), missed: [] };
+  const idxAt = ts => { let k = 0; refs.forEach((r, i) => { if (r <= ts) k = i; }); if (ts >= refs[k] + LESSON_MS && k < refs.length - 1) k++; return k; };
+  const segs = [{ st: scans[0].at, en: Infinity }], missed = [];
+  for (const rd of rounds) {
+    const cur = segs[segs.length - 1];
+    if (!rd.closed || scans.some(c => c.r === rd.n)) continue;
+    if (cur.en !== Infinity || cur.st >= rd.at) continue;          // juba läinud või polnud veel saabunud
+    const nx = scans.find(c => c.at > rd.at);
+    if (nx && idxAt(nx.at) === idxAt(rd.at)) continue;             // tuli sama tunni jooksul tagasi
+    cur.en = rd.at; missed.push(rd.n);
+    if (nx) segs.push({ st: nx.at, en: Infinity });
+  }
+  const per = refs.map(r => {
+    const g = segs.find(x => x.st < r + LATE_MS && x.en > r);
+    if (!g || g.en < r + LESSON_MS) return 'P';
+    return g.st <= r + on ? 'K' : 'H';
+  });
+  return { per, missed };
+}
+window.__kohCalc = { calcPer, LATE_MS, LESSON_MS };
+/* Iga õpilase staatus: käsitsi parandus või skaneerimiste järgi. st: K, H, P, O (osaliselt), W (ootel). */
 function statuses() {
   const s = SS.session, g = group(s.group_id), ended = !!s.ended_at, t = now();
-  const first = new Map(), byRound = {};
-  for (const c of SS.checkins) {
-    if (!first.has(c.s) || c.at < first.get(c.s).at) first.set(c.s, c);
-    (byRound[c.r] = byRound[c.r] || new Set()).add(c.s);
-  }
-  const roundAt = n => { const r = (s.rounds || []).find(x => x.n === n); return r ? r.at : s.start_at; };
+  const M = metaOf(), refs = lessonRefs(g, s, M), on = s.ontime_min * 60000;
+  const rounds = (s.rounds || []).filter(x => x.n >= 2).sort((x, y) => x.n - y.n).map(x => ({ n: x.n, at: x.at, closed: x.n < s.round || ended || t - x.at > ROUND_GRACE_MS }));
   return g.roster.students.map(stu => {
-    const c = first.get(stu.slot) || null, mark = SS.marks[stu.slot] || null;
-    let auto, late = null;
-    if (c) { const d = c.at - s.start_at; late = Math.max(0, Math.round(d / 60000)); auto = d <= s.ontime_min * 60000 ? 'K' : d < LATE_MS ? 'H' : 'P'; }
-    else auto = (ended || t >= s.start_at + LATE_MS) ? 'P' : 'W';
-    const missed = [];
-    for (let n = (c ? c.r : 1) + 1; n <= s.round; n++) {
-      const closed = n < s.round || ended || t - roundAt(n) > ROUND_GRACE_MS;
-      if (c && closed && !(byRound[n] && byRound[n].has(stu.slot))) missed.push(n);
-    }
-    return { ...stu, st: mark || auto, auto, manual: !!mark, at: c ? c.at : null, late, fresh: SS.checkins.some(x => x.s === stu.slot && x.fresh), missed, bound: SS.bound.includes(stu.slot) };
+    const scans = SS.checkins.filter(c => c.s === stu.slot).sort((x, y) => x.at - y.at), first = scans[0] || null, mark = SS.marks[stu.slot] || null;
+    let { per, missed } = calcPer(refs, on, scans, rounds), st;
+    if (mark) { per = refs.map((_, i) => mark === 'P' ? 'P' : mark === 'H' && i === 0 ? 'H' : 'K'); st = mark; }
+    else if (!first) st = (ended || t >= refs[0] + LATE_MS) ? 'P' : 'W';
+    else st = per.every(x => x === 'K') ? 'K' : per.every(x => x === 'P') ? 'P' : per.includes('P') ? 'O' : 'H';
+    return { ...stu, st, per, manual: !!mark, at: first ? first.at : null, late: first ? Math.max(0, Math.round((first.at - refs[0]) / 60000)) : null,
+      fresh: scans.some(x => x.fresh), missed, bound: SS.bound.includes(stu.slot) };
   });
 }
 function exportTahvel() {
-  const s = SS.session, g = group(s.group_id), d = new Date(s.start_at);
+  const s = SS.session, g = group(s.group_id), d = new Date(s.start_at), M = metaOf();
   return JSON.stringify({
-    v: 1, kind: 'kohalolek', group: g.label,
+    v: 2, kind: 'kohalolek', group: g.label,
     date: d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()), start: hm(s.start_at),
-    students: statuses().map(x => ({ name: x.name, tid: x.tid || null, status: x.st === 'W' ? 'P' : x.st, min: x.late, missed: x.missed })),
+    entry: { date: dmy(s.start_at), startNr: M.nr, lessons: M.n, type: M.type || null, cap: M.cap },
+    // status „P“ ka osalise puudumise korral, et vanem skript ei jätaks kedagi ekslikult kohalolijaks; täpne jaotus on väljal per
+    students: statuses().map(x => ({ name: x.name, tid: x.tid || null, status: x.st === 'W' || x.st === 'O' ? 'P' : x.st, per: x.per, min: x.late, missed: x.missed })),
   });
 }
+const perText = (x, nr) => x.per.map((p, i) => p === 'K' ? null : `${nr + i}. tund ${p}`).filter(Boolean).join(', ');
 function exportText() {
-  const s = SS.session, g = group(s.group_id), st = statuses();
-  const P = st.filter(x => x.st === 'P' || x.st === 'W'), H = st.filter(x => x.st === 'H'), M = st.filter(x => x.missed.length && x.st !== 'P');
-  const lines = [`${g.label}, ${dmy(s.start_at)} kell ${hm(s.start_at)}`,
-    `Puudus (${P.length}): ${P.map(x => x.name + (x.at ? ` (saabus ${hm(x.at)})` : '')).join(', ') || '–'}`,
-    `Hilines (${H.length}): ${H.map(x => x.name + (x.late != null ? ` (+${x.late} min)` : '')).join(', ') || '–'}`];
-  if (M.length) lines.push(`Puudus hilisemas kontrollis (${M.length}): ${M.map(x => `${x.name} (kontroll ${x.missed.join(', ')})`).join(', ')}`);
+  const s = SS.session, g = group(s.group_id), st = statuses(), M = metaOf();
+  const P = st.filter(x => x.st === 'P' || x.st === 'W'), H = st.filter(x => x.st === 'H'), O = st.filter(x => x.st === 'O');
+  const lines = [`${g.label}, ${dmy(s.start_at)} kell ${hm(s.start_at)}, tunnid ${M.nr}${M.n > 1 ? '–' + (M.nr + M.n - 1) : ''}`,
+    `Puudus (${P.length}): ${P.map(x => x.name).join(', ') || '–'}`,
+    `Hilines (${H.length}): ${H.map(x => x.name + (x.late != null && !x.manual ? ` (+${x.late} min)` : '')).join(', ') || '–'}`];
+  if (O.length) lines.push(`Osaliselt puudus (${O.length}): ${O.map(x => `${x.name} (${perText(x, M.nr)})`).join('; ')}`);
   return lines.join('\n');
 }
 
@@ -276,6 +342,7 @@ function vGroup() {
     <label class="f">Rühma nimi<input type="text" id="gLabel" maxlength="60" value="${esc(g ? g.label : '')}" placeholder="nt K-VMT-26-1"></label>
     <label class="f">Õpilased, üks nimi rea kohta. Siia võib kleepida ka Tahvlist kopeeritud nimekirja.
       <textarea id="gNames" rows="14" placeholder="Mari Maasikas&#10;Jüri Juurikas">${esc(g ? g.roster.students.map(s => s.name).join('\n') : '')}</textarea></label>
+    <label class="f">Tunniajad<select id="gCampus">${Object.keys(CAMPUS).map(k => `<option value="${k}"${(g ? campusOf(g) : 'K') === k ? ' selected' : ''}>${CAMPUS[k]} (${BELLS[k].slice(0, 6).join(', ')} …)</option>`).join('')}</select></label>
     ${g ? '<p class="small muted" style="margin:0">Nimekirjast eemaldatud õpilase telefoni sidumine kustub. Nime muutmine loob uue õpilase.</p>' : ''}
     ${ui.msg ? `<div class="banner crit">${esc(ui.msg)}</div>` : ''}
     <div class="row"><button class="btn primary" data-act="save-group">Salvesta</button><button class="btn" data-act="home">Loobu</button>
@@ -289,14 +356,20 @@ function vHistory() {
 }
 function vSession() {
   if (!SS) return '<div class="card"><p class="muted" style="margin:0">Laen…</p></div>';
-  const s = SS.session, g = group(s.group_id), ended = !!s.ended_at;
+  const s = SS.session, g = group(s.group_id), ended = !!s.ended_at, M = metaOf();
   return `<div class="row between">
     <div class="row"><button class="btn" data-act="home">← Rühmad</button><h1>${esc(g.label)}</h1><span class="muted mono">${dmy(s.start_at)}</span></div>
     <div class="row">
       <label class="small muted">Tund algas <input type="time" id="startAt" value="${hm(s.start_at)}"></label>
       <label class="small muted">õigeaegne kuni + <input type="number" id="ontime" min="0" max="60" value="${s.ontime_min}"> min</label>
+      <label class="small muted">algustund <select id="mNr">${BELLS[campusOf(g)].map((b, i) => `<option value="${i + 1}"${M.nr === i + 1 ? ' selected' : ''}>${i + 1}. · ${b}</option>`).join('')}</select></label>
+      <label class="small muted">tunde <input type="number" id="mN" min="1" max="12" value="${M.n}"></label>
       ${ended ? '' : `<button class="btn" data-act="round">Uus kontroll</button><button class="btn primary" data-act="end">Lõpeta tund</button>`}
     </div></div>
+  <div class="row small muted">Tahvli kanne:
+    <select id="mType"><option value="">liik valimata</option>${ENTRY_TYPES.map(x => `<option${M.type === x ? ' selected' : ''}>${x}</option>`).join('')}</select>
+    ${CAPS.map(x => `<label class="chk"><input type="checkbox" data-cap="${x}"${M.cap.includes(x) ? ' checked' : ''}> ${x.toLowerCase()}</label>`).join('')}
+  </div>
   <div id="net"></div>
   <div class="split">
     <section class="card qrpane" id="qrpane">
@@ -312,7 +385,7 @@ function vSession() {
       <div class="row between"><h2>Nimekiri</h2><label class="chk"><input type="checkbox" id="hideNames"${ui.hide ? ' checked' : ''}> Peida nimed</label></div>
       <div id="claims"></div>
       <div class="list" id="list"></div>
-      <p class="small muted" style="margin:0">K = kohal, H = hilines (alla 15 min), P = puudub (15 min või rohkem, ÕKE p 9.8). Puuduta nime, et staatust käsitsi muuta.</p>
+      <p class="small muted" style="margin:0">K = kohal, H = hilines (alla 15 min), P = puudub (15 min või rohkem, ÕKE p 9.8), osa = puudus osa tunde. Mitme tunni korral arvestatakse iga tundi eraldi. Puuduta nime, et staatust käsitsi muuta.</p>
     </section>
   </div>`;
 }
@@ -320,19 +393,21 @@ function vSession() {
 function updateSession() {
   if (V.view !== 'session' || !SS || !document.getElementById('list')) return;
   const s = SS.session, st = statuses(), total = st.length;
-  const c = { K: 0, H: 0, P: 0, W: 0 }; st.forEach(x => c[x.st]++);
-  document.getElementById('count').textContent = `Kohal ${c.K + c.H} / ${total}`;
-  document.getElementById('stats').innerHTML = `<span>Hilines <strong>${c.H}</strong></span><span>Puudub <strong>${c.P}</strong></span>${c.W ? `<span>Ootel <strong>${c.W}</strong></span>` : ''}${SS.picking ? `<span>Valib nime <strong>${SS.picking}</strong></span>` : ''}`;
+  const c = { K: 0, H: 0, P: 0, W: 0, O: 0 }; st.forEach(x => c[x.st]++);
+  document.getElementById('count').textContent = `Kohal ${c.K + c.H + c.O} / ${total}`;
+  document.getElementById('stats').innerHTML = `<span>Hilines <strong>${c.H}</strong></span>${c.O ? `<span>Osaliselt <strong>${c.O}</strong></span>` : ''}<span>Puudub <strong>${c.P}</strong></span>${c.W ? `<span>Ootel <strong>${c.W}</strong></span>` : ''}${SS.picking ? `<span>Valib nime <strong>${SS.picking}</strong></span>` : ''}`;
   const rl = document.getElementById('roundLbl'); if (rl) rl.textContent = s.round > 1 ? ` · kontroll ${s.round}` : '';
   document.getElementById('net').innerHTML = ui.net ? '' : '<div class="banner crit">Ühendus serveriga katkes. Proovin uuesti.</div>';
   const nameOf = slot => (st.find(x => x.slot === slot) || {}).name || '?';
+  const nr0 = metaOf().nr;
   document.getElementById('claims').innerHTML = SS.claims.map(cl => `<div class="banner row between"><span><strong>${esc(nameOf(cl.slot))}</strong>: uus telefon tahab selle nimega siduda (${hm(cl.at)}).</span><span class="row"><button class="btn primary" data-act="claim" data-device="${esc(cl.device)}" data-ok="1">Luba</button><button class="btn" data-act="claim" data-device="${esc(cl.device)}" data-ok="0">Keela</button></span></div>`).join('');
-  const lbl = { K: 'K', H: 'H', P: 'P', W: '·' };
+  const lbl = { K: 'K', H: 'H', P: 'P', W: '·', O: 'osa' };
   document.getElementById('list').className = 'list' + (ui.hide ? ' hidden-names' : '');
   document.getElementById('list').innerHTML = st.map(x => {
-    let d = x.manual ? 'käsitsi' : x.at ? (x.st === 'K' ? hm(x.at) : `${x.st === 'P' ? 'saabus ' : ''}${hm(x.at)} (+${x.late} min)`) : (x.st === 'W' ? 'ootel' : '');
+    let d = x.manual ? 'käsitsi' : x.at ? (x.st === 'K' ? hm(x.at) : `${x.st === 'H' ? '' : 'saabus '}${hm(x.at)}${x.late ? ` (+${x.late} min)` : ''}`) : (x.st === 'W' ? 'ootel' : '');
     if (x.manual && x.at) d += ` · ${hm(x.at)}`;
-    const row = `<button class="st" data-act="open" data-slot="${esc(x.slot)}"><span class="chip ${x.st}">${lbl[x.st]}</span><span class="n">${esc(x.name)}${x.fresh ? '<span class="tag">uus sidumine</span>' : ''}${x.missed.length ? `<span class="tag crit">puudus kontrollis ${x.missed.join(', ')}</span>` : ''}</span><span class="d mono">${esc(d)}</span></button>`;
+    const strip = x.per.length > 1 && x.st !== 'K' && x.st !== 'W' ? `<span class="strip">${x.per.map((p, i) => `<span class="mini ${p}" title="${nr0 + i}. tund">${p}</span>`).join('')}</span>` : '';
+    const row = `<button class="st" data-act="open" data-slot="${esc(x.slot)}"><span class="chip ${x.st}">${lbl[x.st]}</span><span class="n">${esc(x.name)}${x.fresh ? '<span class="tag">uus sidumine</span>' : ''}${x.missed.length ? `<span class="tag crit">puudus kontrollis ${x.missed.join(', ')}</span>` : ''}</span><span class="d mono">${strip}${esc(d)}</span></button>`;
     if (ui.openSlot !== x.slot) return row;
     return row + `<div class="acts">${['K', 'H', 'P'].map(v => `<button class="btn${x.manual && x.st === v ? ' primary' : ''}" data-act="mark" data-slot="${esc(x.slot)}" data-st="${v}">${{ K: 'Kohal', H: 'Hilines', P: 'Puudub' }[v]}</button>`).join('')}<button class="btn" data-act="mark" data-slot="${esc(x.slot)}" data-st="">Automaatne</button>${x.bound ? `<button class="btn danger" data-act="unbind" data-slot="${esc(x.slot)}">Eemalda telefoni sidumine</button>` : ''}</div>`;
   }).join('');
@@ -402,7 +477,7 @@ document.addEventListener('click', async ev => {
       const label = document.getElementById('gLabel').value.trim(), names = document.getElementById('gNames').value.split(/\r?\n/).map(cleanName).filter(Boolean);
       if (!label) { document.getElementById('gLabel').focus(); return; }
       b.disabled = true;
-      const ok = await saveGroup(V.id ? group(V.id) : null, label, names, V.tids || null);
+      const ok = await saveGroup(V.id ? group(V.id) : null, label, names, V.tids || null, document.getElementById('gCampus').value);
       if (!ok) { ui.msg = 'Salvestamine ei õnnestunud.'; render(); return; }
       await goHome();
     }
@@ -410,8 +485,14 @@ document.addEventListener('click', async ev => {
     else if (a === 'start') {
       b.disabled = true;
       let ontime = 5; try { ontime = +(localStorage.getItem('koh-ontime') || 5); } catch (e) {}
-      const r = await rpc('koh_session_start', { ...cred(), p_group: b.dataset.id, p_start_at: new Date(now()).toISOString(), p_ontime: ontime, p_teacher: A.teacher || null });
-      if (r.ok) await openSession(r.id); else { ui.msg = 'Tundi ei saanud alustada.'; render(); }
+      const g = group(b.dataset.id), t0 = now(), nr = guessNr(g, t0), bell = bellTimes(g, t0)[nr - 1], d = groupDefaults(g.id);
+      const startAt = bell > t0 ? bell : t0;   // enne kella alustades loetakse hilinemist kellast
+      const r = await rpc('koh_session_start', { ...cred(), p_group: g.id, p_start_at: new Date(startAt).toISOString(), p_ontime: ontime, p_teacher: A.teacher || null });
+      if (!r.ok) { ui.msg = 'Tundi ei saanud alustada.'; render(); return; }
+      const m = { nr, n: +d.n || 2, type: d.type || '', cap: d.cap || [] };
+      try { localStorage.setItem('koh-meta-' + r.id, JSON.stringify(m)); } catch (e) {}
+      try { await rpc('koh_session_meta', { ...cred(), p_session: r.id, p_meta: m }); } catch (e) {}
+      await openSession(r.id);
     }
     else if (a === 'resume') await openSession(b.dataset.id);
     else if (a === 'history') {
@@ -443,6 +524,16 @@ document.addEventListener('change', async ev => {
       const n = Math.min(60, Math.max(0, +t.value || 0)); try { localStorage.setItem('koh-ontime', String(n)); } catch (e) {}
       await act('koh_session_update', { p_session: V.id, p_start_at: null, p_ontime: n }); updateSession();
     }
+    else if (t.id === 'mNr' && SS) {
+      const nr = +t.value, bell = bellTimes(group(SS.session.group_id), SS.session.start_at)[nr - 1];
+      await saveMeta({ nr });
+      await act('koh_session_update', { p_session: V.id, p_start_at: new Date(bell).toISOString(), p_ontime: null });
+      const sa = document.getElementById('startAt'); if (sa) sa.value = hm(bell);
+      updateSession();
+    }
+    else if (t.id === 'mN' && SS) { await saveMeta({ n: Math.min(12, Math.max(1, +t.value || 1)) }); updateSession(); }
+    else if (t.id === 'mType' && SS) { await saveMeta({ type: t.value }); }
+    else if (t.dataset && t.dataset.cap && SS) { await saveMeta({ cap: [...document.querySelectorAll('input[data-cap]:checked')].map(x => x.dataset.cap) }); }
     else if (t.id === 'impFile') {
       const f = t.files && t.files[0]; if (!f) return;
       const list = parseImport(await f.text());
@@ -458,7 +549,7 @@ document.addEventListener('paste', ev => {
   if (!list || list.length !== 1) return;
   ev.preventDefault();
   const it = list[0], lab = document.getElementById('gLabel');
-  if (!lab.value.trim()) lab.value = it.label.slice(0, 60);
+  if (!lab.value.trim()) { lab.value = it.label.slice(0, 60); if (!V.id) document.getElementById('gCampus').value = guessCampus(it.label); }
   ev.target.value = it.names.map(cleanName).join('\n'); V.tids = it.tids;
 });
 

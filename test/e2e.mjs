@@ -31,6 +31,7 @@ await T.click('button[data-act=new-group]');
 // kleebi Tahvli nimekiri (JSON) → täidab nime ja õpilased
 await T.evaluate(() => { const ta = document.getElementById('gNames'); const dt = new DataTransfer(); dt.setData('text', JSON.stringify({ v: 1, kind: 'nimekiri', group: 'NÄIDIS-26', students: [{ name: 'Näidis Aleksander', tid: 101 }, { name: 'Näidis Brita', tid: 102 }, { name: 'Näidis Carl', tid: 103 }, { name: 'Näidis Diana', tid: 104 }] })); ta.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); });
 ok(await T.inputValue('#gLabel') === 'NÄIDIS-26', 'paste filled label');
+ok(await T.inputValue('#gCampus') === 'K', 'campus guessed from label');
 ok((await T.inputValue('#gNames')).split('\n').length === 4, 'paste filled 4 names');
 await T.click('button[data-act=save-group]');
 await T.waitForSelector('button[data-act=start]');
@@ -41,6 +42,26 @@ await T.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg
 const url = () => T.evaluate(() => window.__kohUrl);
 ok((await url()).startsWith(base + '/#'), 'QR url points at student page: ' + (await url()).length + ' chars');
 ok((await T.textContent('#count')).trim() === 'Kohal 0 / 4', 'count 0/4');
+ok(await T.inputValue('#mN') === '2' && /^\d+$/.test(await T.inputValue('#mNr')), 'defaults: 2 lessons, start lesson guessed from the clock');
+await T.fill('#mN', '1'); await T.dispatchEvent('#mN', 'change');
+await T.selectOption('#mType', 'Tund'); await T.check('input[data-cap="Auditoorne õpe"]');
+
+// --- tunnikaupa arvestus: puhas funktsioon kindlate kellaaegadega ---
+const calc = await T.evaluate(() => {
+  const { calcPer } = window.__kohCalc, m = 60000, t0 = Date.UTC(2026, 10, 26, 6, 30);
+  const refs = [t0, t0 + 45 * m, t0 + 105 * m, t0 + 150 * m], on = 5 * m;      // 4 tundi, 15 min vahetund pärast teist
+  const run = (scans, rounds) => { const r = calcPer(refs, on, scans.map(([min, round]) => ({ at: t0 + min * m, r: round || 1 })), (rounds || []).map(([n, min, closed]) => ({ n, at: t0 + min * m, closed: closed !== false }))); return r.per.join('') + (r.missed.length ? ' m' + r.missed.join(',') : ''); };
+  return {
+    onTime: run([[2]]), late7: run([[7]]), late20: run([[20]]), none: run([]),
+    lesson3plus4: run([[109]]), lesson3plus8: run([[113]]), lesson3plus20: run([[125]]),
+    leftAfterL1: run([[1]], [[2, 60]]), leftAndBack: run([[1], [108, 3]], [[2, 60], [3, 100]]), backSameLesson: run([[1], [70, 3]], [[2, 60], [3, 65]]),
+    goneInBreak: run([[1]], [[2, 95]]), openRound: run([[1]], [[2, 60, false]]), arrivedInRound2: run([[70, 2]], [[2, 50]]),
+    scannedBoth: run([[1], [61, 2]], [[2, 60]]),
+  };
+});
+const want = { onTime: 'KKKK', late7: 'HKKK', late20: 'PKKK', none: 'PPPP', lesson3plus4: 'PPKK', lesson3plus8: 'PPHK', lesson3plus20: 'PPPK',
+  leftAfterL1: 'KPPP m2', leftAndBack: 'KPKK m2', backSameLesson: 'KKKK', goneInBreak: 'KKPP m2', openRound: 'KKKK', arrivedInRound2: 'PPKK', scannedBoth: 'KKKK' };
+for (const k of Object.keys(want)) ok(calc[k] === want[k], `per-lesson ${k}: got ${calc[k]}, want ${want[k]}`);
 
 // --- õpilased ---
 const phone = async tag => { const c = await browser.newContext({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 }); const p = await c.newPage(); watch(p, tag); return p; };
@@ -93,6 +114,13 @@ const early = await T.evaluate(() => { const d = new Date(Date.now() - 20 * 6000
 await T.fill('#startAt', early); await T.dispatchEvent('#startAt', 'change');
 await T.waitForFunction(() => [...document.querySelectorAll('button.st')].find(b => b.textContent.includes('Näidis Carl')).querySelector('.chip').textContent === 'P', null, { timeout: 8000 });
 ok(await chip('Näidis Aleksander') === 'P' && await chip('Näidis Diana') === 'H', 'start moved 20 min back → late arrivals P, no-show P, manual H kept');
+await T.fill('#mN', '2'); await T.dispatchEvent('#mN', 'change');
+await T.waitForFunction(() => [...document.querySelectorAll('button.st')].find(b => b.textContent.includes('Näidis Carl')).querySelector('.chip').textContent === 'osa', null, { timeout: 8000 });
+ok(await T.locator('button.st:has-text("Näidis Carl") .mini').allTextContents().then(a => a.join('')) === 'PK', 'two lessons: missed the first, present in the second → osa, strip PK');
+ok((await T.textContent('#count')).trim() === 'Kohal 2 / 4' || (await T.textContent('#count')).trim() === 'Kohal 3 / 4', 'partially present students count as present: ' + (await T.textContent('#count')).trim());
+await T.click('button[data-act=copy-text]').catch(() => {});
+await T.fill('#mN', '1'); await T.dispatchEvent('#mN', 'change');
+await T.waitForFunction(() => [...document.querySelectorAll('button.st')].find(b => b.textContent.includes('Näidis Carl')).querySelector('.chip').textContent === 'P', null, { timeout: 8000 });
 // 8 min tagasi → H
 const mid = await T.evaluate(() => { const d = new Date(Date.now() - 8 * 60000); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); });
 await T.fill('#startAt', mid); await T.dispatchEvent('#startAt', 'change');
@@ -115,11 +143,14 @@ await T.click('button[data-act=copy-tahvel]');
 const exp = JSON.parse(await T.evaluate(() => navigator.clipboard.readText()));
 const byName = Object.fromEntries(exp.students.map(s => [s.name, s]));
 ok(exp.kind === 'kohalolek' && exp.group === 'NÄIDIS-26' && exp.students.length === 4, 'export header');
-ok(byName['Näidis Aleksander'].status === 'P' && byName['Näidis Brita'].status === 'H' && byName['Näidis Carl'].status === 'H' && byName['Näidis Diana'].status === 'H', 'export statuses: ' + JSON.stringify(exp.students.map(s => s.status)));
+ok(exp.v === 2 && exp.entry.lessons === 1 && exp.entry.type === 'Tund' && exp.entry.cap.join() === 'Auditoorne õpe' && /^\d\d\.\d\d\.\d{4}$/.test(exp.entry.date) && exp.entry.startNr >= 1, 'export carries entry details: ' + JSON.stringify(exp.entry));
+ok(exp.students.every(s => Array.isArray(s.per) && s.per.length === 1), 'export has per-lesson statuses');
+// Brita skaneeris alguses (hilinemisega), aga jäi 2. kontrollis skaneerimata → selle tunni eest P
+ok(byName['Näidis Aleksander'].status === 'P' && byName['Näidis Brita'].status === 'P' && byName['Näidis Carl'].status === 'H' && byName['Näidis Diana'].status === 'H', 'export statuses: ' + JSON.stringify(exp.students.map(s => s.status)));
 ok(byName['Näidis Brita'].tid === 102 && byName['Näidis Brita'].missed.join() === '2' && byName['Näidis Carl'].missed.length === 0, 'export keeps Tahvel id + missed rounds');
 await T.click('button[data-act="copy-text"]');
 const txt = await T.evaluate(() => navigator.clipboard.readText());
-ok(txt.includes('Puudus (1): Näidis Aleksander') && txt.includes('Hilines (3)'), 'text export: ' + txt.replace(/\n/g, ' | '));
+ok(txt.includes('Puudus (2): Näidis Aleksander, Näidis Brita') && txt.includes('Hilines (2)') && txt.includes('tunnid '), 'text export: ' + txt.replace(/\n/g, ' | '));
 await T.screenshot({ path: SHOTS + '/7-teacher-ended.png' });
 // lõppenud tunni skaneerimine
 await S1.goto('about:blank'); await S1.goto(bad); await S1.waitForSelector('.card.bad');

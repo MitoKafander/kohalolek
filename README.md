@@ -19,9 +19,15 @@ vormi, kus õpetaja selle üle vaatab ja ise salvestab.
 2. Ekraanil on QR-kood, mis vahetub iga 10 sekundi järel. Õpilased skannivad selle telefoni kaameraga.
 3. Staatus tuleb skaneerimise ajast (ÕKE p 9.8): õigel ajal = kohal, alla 15 min hiljem = **H**,
    15 min või rohkem = **P**. Tunni algusaega ja „õigeaegne kuni“ minuteid saab muuta ka tagantjärele.
-4. Nimel puudutades saab staatust käsitsi muuta (nt tühja telefoniga õpilane).
-5. „Uus kontroll“ palub kõigil uuesti skannida, kui on vaja teada, kes vahepeal lahkus.
-6. „Lõpeta tund“ → „Kopeeri Tahvli jaoks“ → Tahvlis kande aknas „Kleebi kohalolek või märkused“.
+4. Mitme järjestikuse tunni korral (paaristunnid) arvestatakse iga tundi eraldi. Rühmal on kooli
+   tunniajad, tunnil „algustund“ ja „tunde“. Näide: 4 tundi, õpilane skannib 3. tunni alguses 8 min
+   hiljem → 1. ja 2. tund P, 3. tund H, 4. tund kohal.
+5. Nimel puudutades saab staatust käsitsi muuta (nt tühja telefoniga õpilane).
+6. „Uus kontroll“ palub kõigil uuesti skannida. Kes jääb skannimata, loetakse sellest tunnist alates
+   puudujaks, kuni ta uuesti skannib.
+7. „Lõpeta tund“ → „Kopeeri Tahvli jaoks“ → Tahvlis kande aknas „Kleebi kohalolek või märkused“.
+   Skript täidab kande päise (liik, maht, kuupäev, algustund, tundide arv; ainult tühjad väljad) ja
+   puudumised, vajadusel tunni kaupa (veerg „123?“).
 
 ## Andmed ja privaatsus
 

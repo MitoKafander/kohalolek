@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kohalolek → Tahvel
 // @namespace    https://mitokafander.github.io/kohalolek/
-// @version      0.1.1
+// @version      0.2.0
 // @description  Täidab Tahvli päevikukandes puudumised (P/H) ja märkused kohaloleku lehelt kopeeritud andmetest. Ise ei salvesta midagi: õpetaja vaatab üle ja vajutab „Salvesta“.
 // @match        https://tahvel.edu.ee/*
 // @updateURL    https://mitokafander.github.io/kohalolek/kohalolek-tahvel.user.js
@@ -12,7 +12,8 @@
 /* Mida see teeb
  * 1. Päeviku lehel: nupp „Kopeeri nimekiri kohaloleku lehele“ (nimed + Tahvli õpilase id lõikelauale).
  * 2. Kande aknas („Lisa uus sissekanne“ või kande muutmine): nupp „Kleebi kohalolek või märkused“.
- *    - kohaloleku lehe „Kopeeri Tahvli jaoks“ → paneb P ja H linnukesed;
+ *    - kohaloleku lehe „Kopeeri Tahvli jaoks“ → täidab kande päise (liik, maht, kuupäev, algustund, tundide arv)
+ *      ja paneb P ja H linnukesed, mitme tunni korral tunni kaupa (veerg „123?“);
  *    - Tunnimärkmete „Kopeeri kõik nimedega“ (read „Nimi: tekst“) → kirjutab selgituse ja paneb linnukese „Märkus“.
  * Skript ainult täidab vormi. Salvestamise nuppu ta ei puuduta.
  */
@@ -33,8 +34,8 @@
     try {
       const o = JSON.parse(text);
       if (o && Array.isArray(o.students)) {
-        return { kind: o.kind === 'kohalolek' ? 'kohalolek' : 'markused', title: [o.group, o.date, o.start].filter(Boolean).join(' · '),
-          students: o.students.map(s => ({ name: s.name, status: s.status || null, min: s.min, missed: s.missed || [], remark: s.remark || null })) };
+        return { kind: o.kind === 'kohalolek' ? 'kohalolek' : 'markused', title: [o.group, o.date, o.start].filter(Boolean).join(' · '), entry: o.entry || null,
+          students: o.students.map(s => ({ name: s.name, status: s.status || null, per: Array.isArray(s.per) ? s.per : null, min: s.min, missed: s.missed || [], remark: s.remark || null })) };
       }
       return null;
     } catch (e) { /* ei ole JSON: proovi „Nimi: tekst“ ridu */ }
@@ -66,12 +67,81 @@
     }).filter(Boolean);
   }
 
+  /* Kande päis: täidab ainult tühjad väljad. Kui väljal on juba teine väärtus, jätab selle alles ja ütleb aruandes. */
+  async function fillHeader(dialog, e, rep) {
+    const sel = name => dialog.querySelector(`tahvel-select[formcontrolname="${name}"]`);
+    const chosen = el0 => ((el0 && el0.querySelector('.selected-option')) || { textContent: '' }).textContent.trim();
+    const choose = async (name, text, label) => {
+      const el0 = sel(name); if (!el0) { rep.headFail.push(label); return; }
+      const cur = chosen(el0);
+      if (cur === text) { rep.head.push(`${label} ${text}`); return; }
+      if (cur) { rep.headKept.push(`${label} on juba „${cur}“ (andmetes „${text}“)`); return; }
+      const item = [...el0.querySelectorAll('.dropdown-item')].find(x => x.textContent.trim() === text);
+      if (!item) { rep.headFail.push(`${label} „${text}“`); return; }
+      item.click(); await sleep(250);
+      (chosen(el0) === text ? rep.head : rep.headFail).push(`${label} ${text}`);
+    };
+    if (e.type) await choose('entryType', e.type, 'liik');
+    for (const cap of e.cap || []) {
+      const cb = [...dialog.querySelectorAll('[formarrayname="capacityTypes"] checkbox[formcontrolname="selected"]')].find(c => c.innerText.trim() === cap);
+      const r = cb ? await setBox(cb, true) : null;
+      (r === null ? rep.headFail : rep.head).push(cap.toLowerCase());
+    }
+    if (e.date) {
+      const dp = dialog.querySelector('date-picker[formcontrolname="entryDate"]'), inp = dp && dp.querySelector('input');
+      const picked = chosen(sel('entryDateString'));
+      if (!inp) rep.headFail.push('kuupäev');
+      else if (inp.value === e.date) rep.head.push('kuupäev ' + e.date);
+      else if (inp.value || picked) rep.headKept.push(`kuupäev on juba „${inp.value || picked}“ (andmetes „${e.date}“)`);
+      else {
+        inp.focus(); inp.value = e.date;
+        inp.dispatchEvent(new InputEvent('input', { bubbles: true, data: e.date, inputType: 'insertText' }));
+        inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await sleep(400);
+        (inp.value === e.date && !dp.classList.contains('ng-invalid') ? rep.head : rep.headFail).push('kuupäev ' + e.date);
+      }
+    }
+    if (e.startNr != null) await choose('startLessonNr', String(e.startNr), 'algustund');
+    if (e.lessons != null) {
+      const inp = dialog.querySelector('tahvel-input[formcontrolname="lessons"] input'), want = String(e.lessons);
+      if (!inp) rep.headFail.push('tundide arv');
+      else if (inp.value === want) rep.head.push('tunde ' + want);
+      else if (inp.value) rep.headKept.push(`tundide arv on juba ${inp.value} (andmetes ${want})`);
+      else {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, want);
+        for (const ev of ['input', 'change', 'blur']) inp.dispatchEvent(new Event(ev, { bubbles: true }));
+        await sleep(300);
+        (inp.value === want ? rep.head : rep.headFail).push('tunde ' + want);
+      }
+    }
+    await sleep(700);   // Tahvel arvutab read ümber (tunnikaupa lahtrid, kinnitatud puudumised)
+  }
+
+  /* Ühe õpilase puudumine tunni kaupa: lülitab sisse „123?“ ja paneb iga tunni H/P. */
+  async function setPerLesson(tr, per) {
+    const q = n => tr.querySelector(`checkbox[formcontrolname="${n}"]`);
+    if ((await setBox(q('isLessonAbsence'), true)) === null) return false;
+    await sleep(350);
+    const rows = [...tr.querySelectorAll('[formarrayname="lessonAbsences"] > .checkbox-row')];
+    if (rows.length !== per.length) return false;
+    let okAll = true;
+    for (let i = 0; i < rows.length; i++) {
+      const c = n => rows[i].querySelector(`checkbox[formcontrolname="${n}"]`);
+      for (const [name, want] of [['absenceLate', per[i] === 'H'], ['absenceWithoutReason', per[i] === 'P']].sort((x, y) => x[1] - y[1])) {
+        if ((await setBox(c(name), want)) === null) okAll = false;
+      }
+    }
+    return okAll;
+  }
+
   async function apply(dialog, data) {
+    const rep = { P: [], H: [], partial: [], cleared: [], remarks: [], skipped: [], notInData: [], late: [], missed: [], head: [], headKept: [], headFail: [] };
+    if (data.kind === 'kohalolek' && data.entry) await fillHeader(dialog, data.entry, rep);
     const rows = rowsOf(dialog);
+    const lessonsInp = dialog.querySelector('tahvel-input[formcontrolname="lessons"] input');
+    const formLessons = lessonsInp ? parseInt(lessonsInp.value, 10) || 0 : 0;
     const byName = new Map(), byTokens = new Map();
     data.students.forEach(s => { byName.set(norm(s.name), s); byTokens.set(tokens(s.name), s); });
     const used = new Set();
-    const rep = { P: [], H: [], cleared: [], remarks: [], skipped: [], notInData: [], late: [], missed: [] };
     for (const row of rows) {
       const s = byName.get(norm(row.name)) || byTokens.get(tokens(row.name));
       row.tr.style.boxShadow = '';
@@ -81,10 +151,22 @@
       if (data.kind === 'kohalolek' && s.status) {
         const perLesson = isChecked(q('isLessonAbsence'));
         const excused = isChecked(q('absenceExcused')) || isChecked(q('absencePractice'));
-        if (perLesson) { rep.skipped.push(`${row.name} (puudumine on märgitud tunni kaupa)`); }
-        else if (excused) { rep.skipped.push(`${row.name} (Tahvlis juba V või PR)`); }
+        // tunnikaupa jaotus on vaja ainult siis, kui tunnid erinevad (v.a „hilines esimesse tundi“ = tavaline H)
+        const per = s.per && s.per.length > 1 ? s.per : null;
+        const mixed = per && !(per.every(x => x === per[0]) || (per[0] === 'H' && per.slice(1).every(x => x === 'K')));
+        const short = p => p.map((x, i) => x === 'K' ? null : `${i + 1}. ${x}`).filter(Boolean).join(', ');
+        if (excused) { rep.skipped.push(`${row.name} (Tahvlis juba V või PR)`); }
+        else if (perLesson && !per) { rep.skipped.push(`${row.name} (puudumine on juba märgitud tunni kaupa)`); }
+        else if ((perLesson || mixed) && formLessons !== per.length) { rep.skipped.push(`${row.name} (tunnikaupa: ${short(per) || 'kohal'}; kande tundide arv ${formLessons || 'on tühi'}, andmetes ${per.length})`); }
+        else if (perLesson || mixed) {
+          // rida on (või läheb) tunnikaupa režiimi: uuenda iga tunni linnukesed, nii töötab ka korduv kleepimine
+          if (!(await setPerLesson(row.tr, per))) rep.skipped.push(`${row.name} (tunnikaupa märkimine ei õnnestunud: ${short(per)})`);
+          else if (per.every(x => x === 'K')) rep.cleared.push(row.name);
+          else { rep.partial.push(`${row.name} (${short(per)})`); row.tr.style.boxShadow = 'inset 4px 0 0 #A9690F'; }
+        }
         else {
-          const wantP = s.status === 'P', wantH = s.status === 'H';
+          const st = per ? (per[0] === 'P' ? 'P' : per[0] === 'H' ? 'H' : 'K') : s.status;
+          const wantP = st === 'P', wantH = st === 'H';
           let changed = false, failed = false;
           // Tahvel võtab ise H maha, kui P pannakse (ja vastupidi), seega kõigepealt eemaldamised.
           for (const [name, want] of [['absenceLate', wantH], ['absenceWithoutReason', wantP]].sort((a, b) => a[1] - b[1])) {
@@ -94,8 +176,8 @@
           if (failed) rep.skipped.push(`${row.name} (linnuke on lukus)`);
           else if (wantP) rep.P.push(row.name); else if (wantH) rep.H.push(row.name); else if (changed) rep.cleared.push(row.name);
           if (!failed && (wantP || wantH)) row.tr.style.boxShadow = `inset 4px 0 0 ${wantP ? '#A63C27' : '#A9690F'}`;
-          if (wantP && s.min != null) rep.late.push(`${row.name} (saabus +${s.min} min)`);
-          if (s.missed && s.missed.length && !wantP) rep.missed.push(`${row.name} (kontroll ${s.missed.join(', ')})`);
+          if (!per && wantP && s.min != null) rep.late.push(`${row.name} (saabus +${s.min} min)`);
+          if (!per && s.missed && s.missed.length && !wantP) rep.missed.push(`${row.name} (kontroll ${s.missed.join(', ')})`);
         }
       }
       if (s.remark) {
@@ -118,14 +200,15 @@
   function reportHtml(data, rep) {
     const line = (label, list, color) => list.length ? `<div style="margin-top:3px"><strong${color ? ` style="color:${color}"` : ''}>${label} (${list.length}):</strong> ${list.map(x => x.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))).join(', ')}</div>` : '';
     let h = `<div><strong>Täidetud${data.title ? ' · ' + data.title.replace(/[&<>]/g, '') : ''}.</strong> Vaata üle ja vajuta ise „Salvesta“.</div>`;
-    if (data.kind === 'kohalolek') h += line('P pandud', rep.P, '#A63C27') + line('H pandud', rep.H, '#A9690F') + line('Linnuke eemaldatud', rep.cleared);
+    h += line('Päis täidetud', rep.head) + line('Päises jäi muutmata', rep.headKept, '#A63C27') + line('Päises ei õnnestunud', rep.headFail, '#A63C27');
+    if (data.kind === 'kohalolek') h += line('P pandud', rep.P, '#A63C27') + line('H pandud', rep.H, '#A9690F') + line('Tunni kaupa märgitud', rep.partial, '#A9690F') + line('Linnuke eemaldatud', rep.cleared);
     h += line('Märkus kirjutatud', rep.remarks, '#2C6A5D');
     h += line('P, sest saabus hiljem kui 15 min (mitmetunnise kande puhul otsusta ise)', rep.late);
     h += line('Skaneeris alguses, aga puudus hilisemas kontrollis (otsusta ise)', rep.missed, '#A63C27');
     h += line('Jäi vahele', rep.skipped, '#A63C27');
     h += line('Andmetes on, Tahvli kandes ei ole', rep.notInTahvel, '#A63C27');
     h += line('Tahvli kandes on, andmetes ei ole (jäi muutmata)', rep.notInData, '#A63C27');
-    if (!rep.P.length && !rep.H.length && !rep.remarks.length && !rep.cleared.length && rep.notInTahvel.length === data.students.length) h += '<div style="margin-top:3px;color:#A63C27"><strong>Ühtegi nime ei leitud. Kas on õige rühm?</strong></div>';
+    if (!rep.P.length && !rep.H.length && !rep.partial.length && !rep.remarks.length && !rep.cleared.length && rep.notInTahvel.length === data.students.length) h += '<div style="margin-top:3px;color:#A63C27"><strong>Ühtegi nime ei leitud. Kas on õige rühm?</strong></div>';
     return h;
   }
 

@@ -35,7 +35,7 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
   `~/.config/kohalolek/proov_parool.txt`. Korista enda järelt: kustuta proovitund, eemalda sidumised.
 - **Kutsekoodid:** kõik seni tehtud on kasutatud. Uus:
   `insert into kohalolek.invite (code_hash, note) values (encode(sha256(convert_to('KOOD','utf8')),'hex'), 'märkus');`
-- **Testid:** `npm test` = andmebaasi loogika (PGlite, 62), läbiv test Chrome'is (82), skript jäljendatud Tahvli
+- **Testid:** `npm test` = andmebaasi loogika (PGlite, 77), läbiv test Chrome'is (90), skript jäljendatud Tahvli
   vormil (11). Ekraanipildid `test/shots/`.
 - **Päris Tahvli vormi kontroll** vajab kasutaja sisselogimist. Töövõte: eraldi Chrome
   `--remote-debugging-port=9377 --user-data-dir=<ajutine>` ja `playwright-core` `connectOverCDP`. Reeglid: vormi
@@ -55,6 +55,8 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
 - Kasutaja on päris telefoniga skanninud ning loonud oma tööruumi ja rühma; serveris on 3 tööruumi.
 - 27.11.2026: tunnikaupa käsitsi parandus päris lehel näidistööruumis (3 tundi, parandus püsib serveri värske seisu
   järel, teine seade näeb sama, eemaldamine taastab automaatse tulemuse).
+- 27.11.2026: nime lukustamine päris lehel näidistööruumis (lukk püsib, õpilane näeb teadet, „Valisin vale
+  nime“, õpetaja keelab ja lubab, seotud telefon skannib edasi ilma küsimata; lõpus lukk ja sidumine eemaldatud).
 
 ## Proovimata
 
@@ -76,8 +78,12 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
 
 ## Komistuskivid
 
-- **`koh_session_state`, `koh_ws_login` ja `koh_checkin`** on mitmes migratsioonis uuesti defineeritud. Kehtib
-  kõige uuema migratsiooni variant (praegu: `…_notes.sql` ja `…_retention.sql`); muutes kopeeri sealt.
+- **`koh_session_state`, `koh_ws_login`, `koh_bind` ja `koh_checkin`** on mitmes migratsioonis uuesti
+  defineeritud. Kehtib kõige uuema migratsiooni variant (praegu: esimesed kolm `…_lock.sql`, `koh_checkin`
+  `…_retention.sql`); muutes kopeeri sealt.
+- **Nime lukk** on rühma veerus `grp.locked` (kohakoodide loend), mitte tunni küljes. Lukus vaba nimi läheb
+  samale ooteteele mis telefoni vahetus (`claim` → `koh_claim_resolve`). Õpilasele lukke ei saadeta: ta näeb
+  lukku alles pärast nime valimist. Nimekirjast eemaldatud koha lukk kaob järgmisel `koh_lock` kutsel.
 - **Tunnikaupa käsitsi parandus** hoitakse märkmete hoidlas (`kohalolek.note`) eraldi tüübina `~per`: krüpteeritud
   kirje `{s: koht, t: '~per', v: {tunni number: K|H|P}, at}`. Nii ei olnud vaja serverit muuta. Kehtib õpilase
   hiliseim kirje; lehel annab `events()` kõik kirjed ja `notes()` jätab need välja. Võti on tunni number (mitte
@@ -95,12 +101,12 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
 - **Pages'i töövoog:** üleslaadimine ja avaldamine peavad olema eraldi töödes (samas töös „0 artifacts“).
 - **Tasuta Supabase** uinub 7 päeva jõudeoleku järel; `.github/workflows/keepalive.yml` teeb päringu E ja N
   ning käivitab varuks `koh_cleanup`. Uinunud projektis `pg_cron` ei jookse.
-- **Kustutamine** eemaldab ainult tunnid (kaskaadiga skaneeringud, parandused, märkmed). Nimekirjad ja
-  sidumised jäävad; kui neile on vaja tähtaega, tuleb see eraldi teha.
+- **Kustutamine** eemaldab ainult tunnid (kaskaadiga skaneeringud, parandused, märkmed). Nimekirjad,
+  sidumised ja lukud jäävad; kui neile on vaja tähtaega, tuleb see eraldi teha.
 - **Nime valimine on nõrk koht** (päris telefoniga järele proovitud 27.11.2026): tundmatu brauser (andmed
   kustutatud, privaatne aken, teine brauser) saab valida iga vaba nime, nii et üks telefon võib märkida mitu
-  inimest. Õpetaja luba küsitakse ainult juba seotud nime puhul. Lahendus otsustamata: iga uus sidumine
-  õpetaja loaga; tugevam tuvastus (eeID/Smart-ID või HarID) on kallim ja toob isikukoodi töötlemise.
+  inimest. Õpetaja luba küsitakse ainult juba seotud või lukustatud nime puhul. Lahendus otsustamata: iga uus
+  sidumine õpetaja loaga (lukustamise tee on selleks olemas: sama, mis kõigi vabade nimede lukustamine); tugevam tuvastus (eeID/Smart-ID või HarID) on kallim ja toob isikukoodi töötlemise.
 - **iPhone'i Safari** kustutab saidi andmed, kui 7 Safari kasutuspäeva jooksul pole lehel ühtki puudutust
   (WebKiti jälgimistõkke reegel: loeb klõps, puudutus või klahvivajutus; lehe avamine ja kerimine ei loe).
   Õpilase leht märgib korduval skannimisel kohaloleku ilma puudutuseta, seega võib sidumine iPhone'is kaduda

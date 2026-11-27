@@ -29,6 +29,9 @@ Arendust jätkates loe esmalt [RESUME_HERE.md](RESUME_HERE.md); muudatused on [C
    võetakse algustund ja tundide arv sealt; muidu pakub leht neid kella ja eelmise korra järgi.
 5. Nimel puudutades saab staatust käsitsi muuta (nt tühja telefoniga õpilane): ülemised nupud kogu ploki kohta,
    mitme tunni korral rida „Tunni kaupa“ iga tunni kohta eraldi (nt skannis hilja, aga puudus tegelikult vähem).
+   Samas on nupp „Lukusta nimi“: lukus nimega saab telefoni siduda ainult õpetaja loal (nt õpilane, kes koolis
+   ei käi). Õpilane saab nime valida, näeb teadet „Pöördu õpetaja poole“ ja õpetaja lehele ilmub „Luba / Keela“.
+   Lukk kehtib rühmas ka järgmistes tundides, kuni õpetaja selle avab.
 6. „Uus kontroll“ palub kõigil uuesti skannida. Kes jääb skannimata, loetakse sellest tunnist alates
    puudujaks, kuni ta uuesti skannib.
 7. „Lõpeta tund“ → „Kopeeri Tahvli jaoks“ → Tahvlis kande aknas „Kleebi kohalolek või märkused“.
@@ -69,9 +72,12 @@ Krüpteeritud andmed on endiselt isikuandmed.
 ## Petmise vastu
 
 Kood kehtib kuni 30 sekundit ja iga telefon on seotud ühe nimega, nii et sõbrale saadetud pilt ei
-tööta ja teise eest oma telefoniga kohal olla ei saa. Uue telefoni sidumise juba seotud nimega peab
-õpetaja lubama. Päris kindel pole ükski QR-süsteem: ekraanil olev „Kohal 23 / 25“ versus pead klassis
-jääb õpetaja kontrolliks.
+tööta. Uue telefoni sidumise juba seotud või lukustatud nimega peab õpetaja lubama.
+
+Teadaolev nõrk koht: brauser, mille andmed on kustutatud (või privaatne aken, teine brauser), on serveri
+jaoks uus telefon ja saab valida iga vaba, lukustamata nime. Nii võib üks telefon märkida kohale ka
+puuduva kaaslase. Seda saab kitsendada puudujate nimede lukustamisega; ekraanil olev „Kohal 23 / 25“
+versus pead klassis jääb õpetaja kontrolliks.
 
 ## Tahvli skript
 

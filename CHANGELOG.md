@@ -14,8 +14,29 @@
 - Silt „uus sidumine“ kaob, kui telefoni sidumine eemaldatakse (varem jäi tunni lõpuni alles). Skaneering ise
   jääb tunni andmetesse.
 
+### Nime lukustamine (hiljem samal päeval)
+- Õpetaja lehel nimel puudutades nupp „Lukusta nimi“ / „Ava nime lukk“; lukus nime kõrval silt „lukus“, rühma
+  kaardil „N nime lukus“. Lukk kuulub rühmale ja kehtib ka järgmistes tundides.
+- Lukus nime saab õpilane valida, aga sidumine jääb ootele: õpilane näeb „Selle nimega saab telefoni siduda
+  ainult õpetaja loal. Pöördu õpetaja poole.“, õpetaja lehele ilmub „nimi on lukus, telefon tahab selle nimega
+  siduda“ nuppudega „Luba“ ja „Keela“. Juba seotud telefoni lukk ei puuduta.
+- Õpilase ootelehel nupp „Valisin vale nime“, mis viib tagasi nimede juurde (ka telefoni vahetuse ootel).
+- Server: uus migratsioon `…_lock.sql` (`grp.locked`, `koh_lock`; `koh_bind` vastuses `why: locked | taken`).
+
+### Parandused (hiljem samal päeval)
+- Õpetaja lehe allservas oli kogu aeg näha tühi teateriba nupuga „Võta tagasi“ (`.toast` stiil tühistas
+  atribuudi `hidden`).
+- Kui telefon küsis esmalt hõivatud nime ja sidus end siis teise, vaba nimega, jäi esimene soov õpetaja
+  lehele rippuma; nüüd kustub see sidumisel.
+- Testi võltstunniplaan läks pärast kella 22.20 üle südaöö ja üks test kukkus; plokk lõpeb nüüd hiljemalt 23.59.
+
+**Otsused**
+- Lukus nimi jääb õpilase nimekirja nähtavale (ei peideta), nagu tellija soovis: valida saab, aga tuleb teade.
+- Õpetaja luba ei ava lukku: lukku muudab ainult õpetaja nupust.
+
 ### Leitud nõrkused (lahendamata)
-- Tundmatu brauser saab valida iga vaba nime, nii et üks telefon võib märkida mitu inimest.
+- Tundmatu brauser saab valida iga vaba nime, nii et üks telefon võib märkida mitu inimest. Lukustamine
+  kitsendab seda ainult lukku pandud nimede osas.
 - iPhone'i Safari võib telefoni sidumise umbes nädalaga kustutada, sest korduv skannimine ei sisalda puudutust.
 - Mõlema kirjeldus ja võimalikud lahendused: RESUME_HERE, „Komistuskivid“.
 

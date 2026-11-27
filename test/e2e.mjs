@@ -218,12 +218,17 @@ await perBtn(1, 'K').click(); await chipIs('Näidis Aleksander', 'P');
 await T.fill('#mN', '1'); await T.dispatchEvent('#mN', 'change');
 await T.waitForSelector('.acts.per', { state: 'detached' });
 await T.click('button.st:has-text("Näidis Aleksander")');
+// sidumise eemaldamine: silt „uus sidumine“ kaob, skaneering ise jääb alles
+ok((await carl().textContent()).includes('uus sidumine'), 'phone bound in this session → tag shown');
+await carl().click(); await T.click('button[data-act=unbind]'); await T.click('button[data-act=unbind]');
+await T.waitForFunction(() => ![...document.querySelectorAll('button.st')].find(b => b.textContent.includes('Näidis Carl')).textContent.includes('uus sidumine'), null, { timeout: 8000 });
+ok(await chip('Näidis Carl') === 'H' && !(await T.isVisible('button[data-act=unbind]')), 'binding removed → tag gone, the scan itself stays');
 // lõppenud tunni skaneerimine
 await S1.goto('about:blank'); await S1.goto(bad); await S1.waitForSelector('.card.bad');
 ok((await S1.textContent('.card.bad')).includes('lõpetatud'), 'ended session message');
 // ajalugu + uuesti sisselogimine teises seadmes (võtmed tuletatakse paroolist)
 await T.click('button[data-act=home]'); await T.waitForSelector('button[data-act=history]');
-ok((await T.textContent('.card .small')).includes('2 telefoni seotud'), 'home shows 2 bound phones');
+ok((await T.textContent('.card .small')).includes('1 telefoni seotud'), 'home shows 1 bound phone (one of two was removed above)');
 await T.click('button[data-act=history]'); await T.waitForSelector('button.st[data-act=resume]');
 ok((await T.textContent('button.st[data-act=resume]')).includes('Proovija'), 'history lists the session with teacher name');
 const t2 = await browser.newContext({ viewport: { width: 1100, height: 800 } }); const T2 = await t2.newPage(); watch(T2, 'teacher2');

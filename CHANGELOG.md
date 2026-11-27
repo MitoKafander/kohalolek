@@ -10,6 +10,10 @@
 - Parandus jõuab nimekirja, tekstieksporti ja Tahvli eksporti (`per`). Töötab ka lõpetatud tunnis.
 - Serverit ei muudetud: parandus salvestatakse krüpteeritult samasse hoidlasse kus märkmed (tüüp `~per`).
 
+### Parandus
+- Silt „uus sidumine“ kaob, kui telefoni sidumine eemaldatakse (varem jäi tunni lõpuni alles). Skaneering ise
+  jääb tunni andmetesse.
+
 ### Leitud nõrkused (lahendamata)
 - Tundmatu brauser saab valida iga vaba nime, nii et üks telefon võib märkida mitu inimest.
 - iPhone'i Safari võib telefoni sidumise umbes nädalaga kustutada, sest korduv skannimine ei sisalda puudutust.

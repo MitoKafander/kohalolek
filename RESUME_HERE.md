@@ -35,7 +35,7 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
   `~/.config/kohalolek/proov_parool.txt`. Korista enda järelt: kustuta proovitund, eemalda sidumised.
 - **Kutsekoodid:** kõik seni tehtud on kasutatud. Uus:
   `insert into kohalolek.invite (code_hash, note) values (encode(sha256(convert_to('KOOD','utf8')),'hex'), 'märkus');`
-- **Testid:** `npm test` = andmebaasi loogika (PGlite, 62), läbiv test Chrome'is (80), skript jäljendatud Tahvli
+- **Testid:** `npm test` = andmebaasi loogika (PGlite, 62), läbiv test Chrome'is (82), skript jäljendatud Tahvli
   vormil (11). Ekraanipildid `test/shots/`.
 - **Päris Tahvli vormi kontroll** vajab kasutaja sisselogimist. Töövõte: eraldi Chrome
   `--remote-debugging-port=9377 --user-data-dir=<ajutine>` ja `playwright-core` `connectOverCDP`. Reeglid: vormi

@@ -645,7 +645,7 @@ function updateSession() {
     let d = x.manual ? 'käsitsi' : x.at ? (x.st === 'K' ? hm(x.at) : `${x.st === 'H' ? '' : 'saabus '}${hm(x.at)}${x.late ? ` (+${x.late} min)` : ''}`) : (x.st === 'W' ? 'ootel' : '');
     if (x.manual && x.at) d += ` · ${hm(x.at)}`;
     const strip = x.per.length > 1 && x.st !== 'K' && x.st !== 'W' ? `<span class="strip">${x.per.map((p, i) => `<span class="mini ${p}" title="${nr0 + i}. tund">${p}</span>`).join('')}</span>` : '';
-    const row = `<button class="st" data-act="open" data-slot="${esc(x.slot)}"><span class="chip ${x.st}">${lbl[x.st]}</span><span class="n">${esc(x.name)}${x.fresh ? '<span class="tag">uus sidumine</span>' : ''}${x.missed.length ? `<span class="tag crit">puudus kontrollis ${x.missed.join(', ')}</span>` : ''}${ns.some(n => n.s === x.slot) ? `<span class="tag" style="background:var(--line);color:var(--ink)">märkeid ${ns.filter(n => n.s === x.slot).length}</span>` : ''}</span><span class="d mono">${strip}${esc(d)}</span></button>`;
+    const row = `<button class="st" data-act="open" data-slot="${esc(x.slot)}"><span class="chip ${x.st}">${lbl[x.st]}</span><span class="n">${esc(x.name)}${x.fresh && x.bound ? '<span class="tag">uus sidumine</span>' : ''}${x.missed.length ? `<span class="tag crit">puudus kontrollis ${x.missed.join(', ')}</span>` : ''}${ns.some(n => n.s === x.slot) ? `<span class="tag" style="background:var(--line);color:var(--ink)">märkeid ${ns.filter(n => n.s === x.slot).length}</span>` : ''}</span><span class="d mono">${strip}${esc(d)}</span></button>`;
     if (ui.openSlot !== x.slot) return row;
     const full = { K: 'Kohal', H: 'Hilines', P: 'Puudub' };
     /* Mitme tunni korral saab iga tundi eraldi muuta. Värviline nupp = kehtiv staatus, alumine triip = käsitsi pandud. */

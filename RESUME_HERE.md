@@ -53,6 +53,8 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
 - Säilitustähtaeg: kõigil tööruumidel 7 päeva, `cron.job` „kohalolek-cleanup“ iga öö 01:23 UTC (aktiivne),
   käsitsi käivitus töötab. Esimest päris kustutamist pole veel näinud (ühtegi nii vana tundi ei ole).
 - Kasutaja on päris telefoniga skanninud ning loonud oma tööruumi ja rühma; serveris on 3 tööruumi.
+- 27.11.2026: tunnikaupa käsitsi parandus päris lehel näidistööruumis (3 tundi, parandus püsib serveri värske seisu
+  järel, teine seade näeb sama, eemaldamine taastab automaatse tulemuse).
 
 ## Proovimata
 

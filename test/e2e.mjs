@@ -254,6 +254,12 @@ ok((await carl().textContent()).includes('uus sidumine'), 'phone bound in this s
 await carl().click(); await T.click('button[data-act=unbind]'); await T.click('button[data-act=unbind]');
 await T.waitForFunction(() => ![...document.querySelectorAll('button.st')].find(b => b.textContent.includes('Näidis Carl')).textContent.includes('uus sidumine'), null, { timeout: 8000 });
 ok(await chip('Näidis Carl') === 'H' && !(await T.isVisible('button[data-act=unbind]')), 'binding removed → tag gone, the scan itself stays');
+// lukk lõpetatud tunni vaates (ajalugu): lukk kuulub rühmale, nii et seda saab muuta ka siit
+await diana().click(); await T.waitForSelector('button[data-act=lock]');
+await T.click('button[data-act=lock]'); await tagIs('Näidis Diana', 'lukus', false);
+await T.click('button[data-act=lock]'); await tagIs('Näidis Diana', 'lukus', true);
+ok(true, 'ended session: the lock can be removed and set');
+await diana().click(); await T.waitForSelector('button[data-act=lock]', { state: 'detached' });
 // lõppenud tunni skaneerimine
 await S1.goto('about:blank'); await S1.goto(bad); await S1.waitForSelector('.card.bad');
 ok((await S1.textContent('.card.bad')).includes('lõpetatud'), 'ended session message');
@@ -280,6 +286,12 @@ ok((await T.inputValue('#ntTypes')).includes('Hilineb | tuli pausilt') && (await
 // kaks õpetaja seadet samas tunnis: teises seadmes tehtud muudatused jõuavad esimesse
 await T.waitForSelector('button[data-act=start]'); await T.click('button[data-act=start]');
 await T.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg'));
+ok((await diana().textContent()).includes('lukus'), 'a lock set in an ended session applies in the next lesson of the group');
+const S5 = await phone('s5'); await S5.goto(await url()); await S5.waitForSelector('button[data-slot]');
+await S5.click('button[data-slot]:has-text("Näidis Diana")'); await S5.click('#yes'); await S5.waitForSelector('.card.wait');
+ok((await S5.textContent('.card.wait')).includes('ainult õpetaja loal'), 'next lesson: the locked name still needs the teacher');
+await T.waitForSelector('#claims button[data-act=claim][data-ok="0"]', { timeout: 8000 }); await T.click('#claims button[data-act=claim][data-ok="0"]');
+await T.waitForFunction(() => !document.getElementById('claims').children.length, null, { timeout: 8000 });
 // T2: rühmade leht uuesti, et näha käimasolevat tundi
 await T2.click('button[data-act=edit-group]'); await T2.click('button[data-act=home]'); await T2.waitForSelector('button[data-act=resume]'); await T2.click('button[data-act=resume]');
 await T2.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg'));

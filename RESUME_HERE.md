@@ -35,7 +35,7 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
   `~/.config/kohalolek/proov_parool.txt`. Korista enda järelt: kustuta proovitund, eemalda sidumised.
 - **Kutsekoodid:** kõik seni tehtud on kasutatud. Uus:
   `insert into kohalolek.invite (code_hash, note) values (encode(sha256(convert_to('KOOD','utf8')),'hex'), 'märkus');`
-- **Testid:** `npm test` = andmebaasi loogika (PGlite, 62), läbiv test Chrome'is (69), skript jäljendatud Tahvli
+- **Testid:** `npm test` = andmebaasi loogika (PGlite, 62), läbiv test Chrome'is (80), skript jäljendatud Tahvli
   vormil (11). Ekraanipildid `test/shots/`.
 - **Päris Tahvli vormi kontroll** vajab kasutaja sisselogimist. Töövõte: eraldi Chrome
   `--remote-debugging-port=9377 --user-data-dir=<ajutine>` ja `playwright-core` `connectOverCDP`. Reeglid: vormi
@@ -69,13 +69,17 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
 2. Kasutajalt vastuseta: kas tuua siia perioodi kokkuvõte rühmajuhendajale (Tunnimärkmetes oli) ja kas teha
    tunniplaanist eeltäitmine ka teise õpetaja tundidele (praegu ainult ühe õpetaja tunniplaan).
 3. Andmebaasi võti aegub kunagi: siis palu uus samade õigustega ja lase kleepida tühja faili (`open -e`).
-4. Ideed, mida pole küsitud: tunnikaupa staatuse käsitsi muutmine õpetaja lehel, asenduste arvestamine
+4. Ideed, mida pole küsitud: asenduste arvestamine
    tunniplaanis, lisaandmete aatomne salvestus serveris, kooli Microsofti konto õpilase tuvastamiseks.
 
 ## Komistuskivid
 
 - **`koh_session_state`, `koh_ws_login` ja `koh_checkin`** on mitmes migratsioonis uuesti defineeritud. Kehtib
   kõige uuema migratsiooni variant (praegu: `…_notes.sql` ja `…_retention.sql`); muutes kopeeri sealt.
+- **Tunnikaupa käsitsi parandus** hoitakse märkmete hoidlas (`kohalolek.note`) eraldi tüübina `~per`: krüpteeritud
+  kirje `{s: koht, t: '~per', v: {tunni number: K|H|P}, at}`. Nii ei olnud vaja serverit muuta. Kehtib õpilase
+  hiliseim kirje; lehel annab `events()` kõik kirjed ja `notes()` jätab need välja. Võti on tunni number (mitte
+  järjekord plokis), et algustunni või tundide arvu muutmine parandust valesse tundi ei nihutaks.
 - **Vahetuv kood:** 10 s aken ja sama arvutus peab klappima SQL-is (`kohalolek.token`) ja JS-is (`KOH.token`).
 - **Tööruumi nime teisendus** (`normCode`) peab olema loomisel ja sisselogimisel sama, sest nimi on võtme sool.
   Parool ei ole taastatav.
@@ -91,5 +95,13 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
   ning käivitab varuks `koh_cleanup`. Uinunud projektis `pg_cron` ei jookse.
 - **Kustutamine** eemaldab ainult tunnid (kaskaadiga skaneeringud, parandused, märkmed). Nimekirjad ja
   sidumised jäävad; kui neile on vaja tähtaega, tuleb see eraldi teha.
-- **iPhone'i Safari** kustutab 7 päeva kasutamata saidi andmed: pärast vaheaega võib telefoni sidumine kaduda,
-  siis küsib õpilane nime uuesti ja õpetaja vajutab „Luba“.
+- **Nime valimine on nõrk koht** (päris telefoniga järele proovitud 27.11.2026): tundmatu brauser (andmed
+  kustutatud, privaatne aken, teine brauser) saab valida iga vaba nime, nii et üks telefon võib märkida mitu
+  inimest. Õpetaja luba küsitakse ainult juba seotud nime puhul. Lahendus otsustamata: iga uus sidumine
+  õpetaja loaga; tugevam tuvastus (eeID/Smart-ID või HarID) on kallim ja toob isikukoodi töötlemise.
+- **iPhone'i Safari** kustutab saidi andmed, kui 7 Safari kasutuspäeva jooksul pole lehel ühtki puudutust
+  (WebKiti jälgimistõkke reegel: loeb klõps, puudutus või klahvivajutus; lehe avamine ja kerimine ei loe).
+  Õpilase leht märgib korduval skannimisel kohaloleku ilma puudutuseta, seega võib sidumine iPhone'is kaduda
+  umbes nädalaga ka siis, kui õpilane skannib iga päev. Päris telefonis kontrollimata. Siis küsib leht nime
+  uuesti ja õpetaja vajutab „Luba“. Võimalikud lahendused: puudutus iga skannimise juures (nupp enne
+  märkimist); seadmekoodi hoidmine pääsuvõtmena (passkey).

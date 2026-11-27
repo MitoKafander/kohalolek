@@ -27,7 +27,8 @@ Arendust jätkates loe esmalt [RESUME_HERE.md](RESUME_HERE.md); muudatused on [C
    hiljem → 1. ja 2. tund P, 3. tund H, 4. tund kohal.
    Kui sama aadressi all on tunniplaani leht (`/tunniplaan/data/snap.json`) ja rühma tund parajasti käib,
    võetakse algustund ja tundide arv sealt; muidu pakub leht neid kella ja eelmise korra järgi.
-5. Nimel puudutades saab staatust käsitsi muuta (nt tühja telefoniga õpilane).
+5. Nimel puudutades saab staatust käsitsi muuta (nt tühja telefoniga õpilane): ülemised nupud kogu ploki kohta,
+   mitme tunni korral rida „Tunni kaupa“ iga tunni kohta eraldi (nt skannis hilja, aga puudus tegelikult vähem).
 6. „Uus kontroll“ palub kõigil uuesti skannida. Kes jääb skannimata, loetakse sellest tunnist alates
    puudujaks, kuni ta uuesti skannib.
 7. „Lõpeta tund“ → „Kopeeri Tahvli jaoks“ → Tahvlis kande aknas „Kleebi kohalolek või märkused“.

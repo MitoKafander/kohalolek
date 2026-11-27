@@ -68,6 +68,16 @@ label.chk{display:inline-flex;gap:6px;align-items:center;font-size:14px;cursor:p
 .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:5px;padding:1px 5px;margin-left:6px;background:var(--warm-soft);color:var(--warm);vertical-align:1px}
 .tag.crit{background:var(--crit-soft);color:var(--crit)}
 .acts{display:flex;flex-wrap:wrap;gap:6px;padding:8px 4px 12px;border-bottom:1px solid var(--line)}
+.acts.cont{border-bottom:0;padding-bottom:6px}
+.acts.per{align-items:center;padding-top:0;gap:6px 12px}
+.lk{display:inline-flex;align-items:center;gap:3px}
+.lnr{font-size:13px;color:var(--muted);min-width:20px;text-align:right;margin-right:2px}
+.pb{font:inherit;font-size:14px;font-weight:700;width:36px;height:36px;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:7px;cursor:pointer}
+.pb.on.K{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.pb.on.H{background:var(--warm-soft);color:var(--warm);border-color:var(--warm)}
+.pb.on.P{background:var(--crit-soft);color:var(--crit);border-color:var(--crit)}
+.pb.man{box-shadow:inset 0 -4px 0 currentColor}
+.pb:disabled{opacity:.5;cursor:default}
 .grp{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
 .hidden-names .n{filter:blur(7px)}
 /* telefonis märkmete vaates jääb tunni seadete plokk peitu, et tabel oleks kohe ees (seaded on vahekaardil Kohalolek) */
@@ -324,7 +334,38 @@ function syncHeader() {
 }
 /* Iga õpilase staatus: käsitsi parandus või skaneerimise aja järgi. */
 /* ---------- märkused ja kiitused ---------- */
-const notes = () => (SS.notes || []).map(n => { const o = noteCache.get(n.id); return o ? { id: n.id, ...o } : null; }).filter(Boolean);
+const PER = '~per';      // tunnikaupa käsitsi parandus: hoitakse samas krüpteeritud hoidlas kui märkmed, eraldi tüübina
+const events = () => (SS.notes || []).map(n => { const o = noteCache.get(n.id); return o ? { id: n.id, ...o } : null; }).filter(Boolean);
+const notes = () => events().filter(n => n.t !== PER);
+/* Tunnikaupa käsitsi parandused: koht → {tunni number: K|H|P}. Kehtib õpilase kõige hilisem kirje. */
+function perOv() {
+  const out = {};
+  events().filter(n => n.t === PER).sort((a, b) => a.at - b.at).forEach(n => { out[n.s] = n.v && typeof n.v === 'object' ? n.v : {}; });
+  return out;
+}
+/* Paneb ühe tunni staatuse käsitsi paika; sama staatuse teistkordne valik võtab paranduse maha (tagasi automaatseks).
+ * Uus kirje salvestatakse enne vanade kustutamist, et parandus ei kaoks ka siis, kui ühendus poole peal katkeb. */
+async function setPer(slot, nr, v) {
+  const old = events().filter(n => n.t === PER && n.s === slot), next = { ...(perOv()[slot] || {}) };
+  if (next[nr] === v) delete next[nr]; else next[nr] = v;
+  for (const k of Object.keys(next)) if (!(+k >= 1 && +k <= 20) || !['K', 'H', 'P'].includes(next[k])) delete next[k];
+  if (Object.keys(next).length) {
+    const obj = { s: slot, t: PER, v: next, at: Math.max(now(), ...old.map(e => e.at + 1)) };
+    const blob = await KOH.encrypt(A.enc, obj);
+    const r = await rpc('koh_note_add', { ...cred(), p_session: V.id, p_blob: blob });
+    if (!r.ok) { toast('Parandust ei saanud salvestada.'); updateSession(); return; }
+    noteCache.set(r.id, obj); (SS.notes = SS.notes || []).push({ id: r.id, blob });
+  }
+  await dropEvents(old);
+  updateSession();
+}
+async function clearPer(slot) { await dropEvents(events().filter(n => n.t === PER && n.s === slot)); }
+async function dropEvents(list) {
+  if (!list.length) return;
+  const sid = V.id, gone = new Set(list.map(e => e.id));
+  for (const e of list) await rpc('koh_note_del', { ...cred(), p_session: sid, p_id: e.id });
+  if (SS && SS.notes && V.id === sid) SS.notes = SS.notes.filter(n => !gone.has(n.id));
+}
 const typeOf = id => NT.types.find(t => t.id === id) || null;
 const fT = t => hm(t).replace(':', '.');
 const cap1 = x => x.charAt(0).toUpperCase() + x.slice(1);
@@ -437,18 +478,23 @@ function calcPer(refs, on, scans, rounds) {
   return { per, missed };
 }
 window.__kohCalc = { calcPer, timetableHint, LATE_MS, LESSON_MS };
-/* Iga õpilase staatus: käsitsi parandus või skaneerimiste järgi. st: K, H, P, O (osaliselt), W (ootel). */
+/* Iga õpilase staatus. Järjekord: skaneerimiste järgi arvutatu → kogu ploki käsitsi parandus (mark) → üksiku tunni
+ * käsitsi parandus (pin). st: K, H, P, O (osaliselt), W (ootel). */
 function statuses() {
   const s = SS.session, g = group(s.group_id), ended = !!s.ended_at, t = now();
-  const M = metaOf(), refs = lessonRefs(g, s, M), on = s.ontime_min * 60000;
+  const M = metaOf(), refs = lessonRefs(g, s, M), on = s.ontime_min * 60000, ovAll = perOv();
   const rounds = (s.rounds || []).filter(x => x.n >= 2).sort((x, y) => x.n - y.n).map(x => ({ n: x.n, at: x.at, closed: x.n < s.round || ended || t - x.at > ROUND_GRACE_MS }));
+  const sum = per => per.every(x => x === 'K') ? 'K' : per.every(x => x === 'P') ? 'P' : per.includes('P') ? 'O' : 'H';
   return g.roster.students.map(stu => {
-    const scans = SS.checkins.filter(c => c.s === stu.slot).sort((x, y) => x.at - y.at), first = scans[0] || null, mark = SS.marks[stu.slot] || null;
+    const scans = SS.checkins.filter(c => c.s === stu.slot).sort((x, y) => x.at - y.at), first = scans[0] || null, mark = SS.marks[stu.slot] || null, ov = ovAll[stu.slot] || {};
     let { per, missed } = calcPer(refs, on, scans, rounds), st;
-    if (mark) { per = refs.map((_, i) => mark === 'P' ? 'P' : mark === 'H' && i === 0 ? 'H' : 'K'); st = mark; }
-    else if (!first) st = (ended || t >= refs[0] + LATE_MS) ? 'P' : 'W';
-    else st = per.every(x => x === 'K') ? 'K' : per.every(x => x === 'P') ? 'P' : per.includes('P') ? 'O' : 'H';
-    return { ...stu, st, per, manual: !!mark, at: first ? first.at : null, late: first ? Math.max(0, Math.round((first.at - refs[0]) / 60000)) : null,
+    if (mark) per = refs.map((_, i) => mark === 'P' ? 'P' : mark === 'H' && i === 0 ? 'H' : 'K');
+    const pin = per.map((_, i) => ['K', 'H', 'P'].includes(ov[M.nr + i]) ? ov[M.nr + i] : null);
+    per = per.map((p, i) => pin[i] || p);
+    const manual = !!mark || pin.some(Boolean);
+    if (!manual && !first) st = (ended || t >= refs[0] + LATE_MS) ? 'P' : 'W';
+    else st = sum(per);
+    return { ...stu, st, per, pin, mark, manual, at: first ? first.at : null, late: first ? Math.max(0, Math.round((first.at - refs[0]) / 60000)) : null,
       fresh: scans.some(x => x.fresh), missed, bound: SS.bound.includes(stu.slot) };
   });
 }
@@ -573,7 +619,7 @@ function vSession() {
       <div class="row between"><h2>Nimekiri</h2><label class="chk"><input type="checkbox" id="hideNames"${ui.hide ? ' checked' : ''}> Peida nimed</label></div>
       <div id="claims"></div>
       <div class="list" id="list"></div>
-      <p class="small muted" style="margin:0">K = kohal, H = hilines (alla 15 min), P = puudub (15 min või rohkem, ÕKE p 9.8), osa = puudus osa tunde. Mitme tunni korral arvestatakse iga tundi eraldi. Puuduta nime, et staatust käsitsi muuta.</p>
+      <p class="small muted" style="margin:0">K = kohal, H = hilines (alla 15 min), P = puudub (15 min või rohkem, ÕKE p 9.8), osa = puudus osa tunde. Mitme tunni korral arvestatakse iga tundi eraldi. Puuduta nime, et staatust käsitsi muuta: ülemised nupud kogu ploki kohta, „Tunni kaupa“ ühe tunni kohta.</p>
     </section>
   </div>`}`;
 }
@@ -601,7 +647,10 @@ function updateSession() {
     const strip = x.per.length > 1 && x.st !== 'K' && x.st !== 'W' ? `<span class="strip">${x.per.map((p, i) => `<span class="mini ${p}" title="${nr0 + i}. tund">${p}</span>`).join('')}</span>` : '';
     const row = `<button class="st" data-act="open" data-slot="${esc(x.slot)}"><span class="chip ${x.st}">${lbl[x.st]}</span><span class="n">${esc(x.name)}${x.fresh ? '<span class="tag">uus sidumine</span>' : ''}${x.missed.length ? `<span class="tag crit">puudus kontrollis ${x.missed.join(', ')}</span>` : ''}${ns.some(n => n.s === x.slot) ? `<span class="tag" style="background:var(--line);color:var(--ink)">märkeid ${ns.filter(n => n.s === x.slot).length}</span>` : ''}</span><span class="d mono">${strip}${esc(d)}</span></button>`;
     if (ui.openSlot !== x.slot) return row;
-    return row + `<div class="acts">${['K', 'H', 'P'].map(v => `<button class="btn${x.manual && x.st === v ? ' primary' : ''}" data-act="mark" data-slot="${esc(x.slot)}" data-st="${v}">${{ K: 'Kohal', H: 'Hilines', P: 'Puudub' }[v]}</button>`).join('')}<button class="btn" data-act="mark" data-slot="${esc(x.slot)}" data-st="">Automaatne</button>${x.bound ? `<button class="btn danger" data-act="unbind" data-slot="${esc(x.slot)}">Eemalda telefoni sidumine</button>` : ''}</div>`;
+    const full = { K: 'Kohal', H: 'Hilines', P: 'Puudub' };
+    /* Mitme tunni korral saab iga tundi eraldi muuta. Värviline nupp = kehtiv staatus, alumine triip = käsitsi pandud. */
+    const perRow = x.per.length > 1 && SS.notes !== undefined ? `<div class="acts per"><span class="small muted">Tunni kaupa:</span>${x.per.map((p, i) => `<span class="lk"><span class="lnr">${nr0 + i}.</span>${['K', 'H', 'P'].map(v => `<button class="pb ${v}${p === v ? ' on' : ''}${x.pin[i] === v ? ' man' : ''}" data-act="per" data-slot="${esc(x.slot)}" data-nr="${nr0 + i}" data-st="${v}" aria-pressed="${p === v}" aria-label="${nr0 + i}. tund: ${full[v]}${x.pin[i] === v ? ' (käsitsi, uus vajutus võtab maha)' : ''}">${v}</button>`).join('')}</span>`).join('')}</div>` : '';
+    return row + `<div class="acts${perRow ? ' cont' : ''}">${['K', 'H', 'P'].map(v => `<button class="btn${x.mark === v && !x.pin.some(Boolean) ? ' primary' : ''}" data-act="mark" data-slot="${esc(x.slot)}" data-st="${v}">${full[v]}</button>`).join('')}<button class="btn" data-act="mark" data-slot="${esc(x.slot)}" data-st="">Automaatne</button>${x.bound ? `<button class="btn danger" data-act="unbind" data-slot="${esc(x.slot)}">Eemalda telefoni sidumine</button>` : ''}</div>${perRow}`;
   }).join('');
 }
 async function updateQr() {
@@ -710,7 +759,8 @@ document.addEventListener('click', async ev => {
       render();
     }
     else if (a === 'open') { ui.openSlot = ui.openSlot === b.dataset.slot ? null : b.dataset.slot; updateSession(); }
-    else if (a === 'mark') { await act('koh_mark', { p_session: V.id, p_slot: b.dataset.slot, p_status: b.dataset.st || null }); ui.openSlot = null; updateSession(); }
+    else if (a === 'per') { b.disabled = true; await setPer(b.dataset.slot, +b.dataset.nr, b.dataset.st); }
+    else if (a === 'mark') { await clearPer(b.dataset.slot); await act('koh_mark', { p_session: V.id, p_slot: b.dataset.slot, p_status: b.dataset.st || null }); ui.openSlot = null; updateSession(); }
     else if (a === 'unbind') { if (!armed(b)) return; await act('koh_unbind', { p_group: SS.session.group_id, p_slot: b.dataset.slot }); ui.openSlot = null; updateSession(); }
     else if (a === 'claim') { await act('koh_claim_resolve', { p_session: V.id, p_device: b.dataset.device, p_approve: b.dataset.ok === '1' }); updateSession(); }
     else if (a === 'round') { if (!armed(b)) return; await act('koh_session_round', { p_session: V.id }); lastQrKey = ''; render(); updateQr(); }

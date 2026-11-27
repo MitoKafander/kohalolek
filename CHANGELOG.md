@@ -1,5 +1,20 @@
 # Muudatuste ajalugu
 
+## 2026-11-27
+
+### Tunnikaupa käsitsi parandus
+- Õpetaja lehel saab mitmetunnise ploki puhul iga tunni staatust (K/H/P) eraldi muuta: puuduta nime, rida
+  „Tunni kaupa“. Värviline nupp on kehtiv staatus, alumine triip näitab käsitsi pandut; sama nupu teistkordne
+  vajutus võtab paranduse maha. Kogu ploki nupud („Kohal“, „Hilines“, „Puudub“, „Automaatne“) tühistavad
+  tunnikaupa parandused.
+- Parandus jõuab nimekirja, tekstieksporti ja Tahvli eksporti (`per`). Töötab ka lõpetatud tunnis.
+- Serverit ei muudetud: parandus salvestatakse krüpteeritult samasse hoidlasse kus märkmed (tüüp `~per`).
+
+### Leitud nõrkused (lahendamata)
+- Tundmatu brauser saab valida iga vaba nime, nii et üks telefon võib märkida mitu inimest.
+- iPhone'i Safari võib telefoni sidumise umbes nädalaga kustutada, sest korduv skannimine ei sisalda puudutust.
+- Mõlema kirjeldus ja võimalikud lahendused: RESUME_HERE, „Komistuskivid“.
+
 ## 2026-11-26 — esimene versioon
 
 ### Põhisüsteem

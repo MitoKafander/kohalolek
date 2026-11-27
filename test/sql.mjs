@@ -57,6 +57,36 @@ st = await rpc('koh_session_state', { ...C, p_session: ss.id });
 await rpc('koh_claim_resolve', { ...C, p_session: ss.id, p_device: st.claims[0].device, p_approve: true });
 ok((await rpc('koh_status', { p_session: ss.id, p_device: D3 })).status === 'ok', 'D3 approved → ok');
 ok((await rpc('koh_checkin', { p_session: ss.id, p_token: tok(1), p_device: D1 })).status === 'bind', 'old phone D1 is unbound now');
+// nime lukustamine: cccc on vaba, aga lukus → sidumine jääb õpetaja loa ootele
+ok((await rpc('koh_lock', { p_code: 'test', p_auth: 'b'.repeat(64), p_group: gs.id, p_slot: 'cccc', p_on: true })).err === 'auth', 'lock needs auth');
+ok((await rpc('koh_lock', { ...C, p_group: gs.id, p_slot: 'zzzz', p_on: true })).err === 'notfound', 'lock of unknown slot rejected');
+ok((await rpc('koh_lock', { ...C, p_group: gs.id, p_slot: 'cccc', p_on: true })).ok === true, 'slot locked');
+st = await rpc('koh_session_state', { ...C, p_session: ss.id });
+ok(st.locked.join() === 'cccc' && (await rpc('koh_ws_login', C)).groups[0].locked.join() === 'cccc', 'lock shown in state and login');
+r = await rpc('koh_checkin', { p_session: ss.id, p_token: tok(1), p_device: D1 });
+ok(r.status === 'bind' && !r.taken.includes('cccc'), 'locked free slot is not listed as taken');
+r = await rpc('koh_bind', { p_session: ss.id, p_device: D1, p_slot: 'cccc' });
+ok(r.status === 'pending' && r.why === 'locked', 'locked free slot → pending, why locked');
+ok((await rpc('koh_bind', { p_session: ss.id, p_device: D1, p_slot: 'aaaa' })).why === 'taken', 'taken slot → pending, why taken');
+await rpc('koh_bind', { p_session: ss.id, p_device: D1, p_slot: 'cccc' });
+st = await rpc('koh_session_state', { ...C, p_session: ss.id });
+ok(st.claims.length === 1 && st.claims[0].slot === 'cccc' && st.bound.length === 2 && !st.checkins.some(c => c.s === 'cccc'), 'locked slot: claim only, no binding, no check-in');
+// lukk maha → sama telefon saab siduda; ootel soov kustub
+await rpc('koh_lock', { ...C, p_group: gs.id, p_slot: 'cccc', p_on: false });
+ok((await rpc('koh_bind', { p_session: ss.id, p_device: D1, p_slot: 'cccc' })).status === 'ok', 'unlocked → binds');
+st = await rpc('koh_session_state', { ...C, p_session: ss.id });
+ok(st.locked.length === 0 && st.claims.length === 0 && st.bound.length === 3, 'binding a free name clears the device\'s earlier claim');
+// juba seotud telefoni lukk ei sega; pärast sidumise eemaldamist on vaja õpetaja luba
+await rpc('koh_lock', { ...C, p_group: gs.id, p_slot: 'cccc', p_on: true });
+ok((await rpc('koh_checkin', { p_session: ss.id, p_token: tok(1), p_device: D1 })).status === 'ok', 'bound phone of a locked name still checks in');
+await rpc('koh_unbind', { ...C, p_group: gs.id, p_slot: 'cccc' });
+ok((await rpc('koh_bind', { p_session: ss.id, p_device: D1, p_slot: 'cccc' })).status === 'pending', 'locked + unbound → pending again');
+st = await rpc('koh_session_state', { ...C, p_session: ss.id });
+await rpc('koh_claim_resolve', { ...C, p_session: ss.id, p_device: st.claims[0].device, p_approve: true });
+st = await rpc('koh_session_state', { ...C, p_session: ss.id });
+ok((await rpc('koh_status', { p_session: ss.id, p_device: D1 })).status === 'ok' && st.bound.includes('cccc') && st.locked.join() === 'cccc', 'teacher approves → bound, lock stays');
+await rpc('koh_unbind', { ...C, p_group: gs.id, p_slot: 'cccc' });
+await rpc('koh_lock', { ...C, p_group: gs.id, p_slot: 'cccc', p_on: false });
 // marks
 await rpc('koh_mark', { ...C, p_session: ss.id, p_slot: 'cccc', p_status: 'H' });
 ok((await rpc('koh_mark', { ...C, p_session: ss.id, p_slot: 'cccc', p_status: 'Q' })).err === 'status', 'bad mark rejected');
@@ -125,6 +155,12 @@ ok((await rpc('koh_ws_login', C)).groups.length === 1, 'groups and rosters stay'
 // slot removal drops binding
 await rpc('koh_group_save', { ...C, p_id: gs.id, p_label: 'G1', p_roster_enc: 'r', p_list_enc: 'l', p_slots: ['bbbb', 'cccc'] });
 ok((await rpc('koh_ws_login', C)).groups[0].bound.length === 0, 'removed slot → binding gone');
+// lukud: teine tööruum ei saa muuta; nimekirjast eemaldatud koha lukk kaob järgmisel muutmisel
+ok((await rpc('koh_lock', { ...O, p_group: gs.id, p_slot: 'bbbb', p_on: true })).err === 'notfound', 'other workspace cannot lock');
+await rpc('koh_lock', { ...C, p_group: gs.id, p_slot: 'bbbb', p_on: true });
+await rpc('koh_group_save', { ...C, p_id: gs.id, p_label: 'G1', p_roster_enc: 'r', p_list_enc: 'l', p_slots: ['cccc'] });
+await rpc('koh_lock', { ...C, p_group: gs.id, p_slot: 'cccc', p_on: true });
+ok((await rpc('koh_ws_login', C)).groups[0].locked.join() === 'cccc', 'lock of a removed slot is pruned');
 // no table leaks: device ids stored hashed
 const raw = (await db.query(`select device from kohalolek.arrival limit 1`)).rows[0].device;
 ok(/^[0-9a-f]{64}$/.test(raw), 'device stored as hash');

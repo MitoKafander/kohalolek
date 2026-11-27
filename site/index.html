@@ -78,11 +78,18 @@ footer{max-width:520px;margin:16px auto 0;font-size:13px;color:var(--muted);text
     card('bad', '', 'Ühendus ei õnnestunud', '<p>Kontrolli internetti ja skanni kood uuesti.</p>');
   }
 
-  async function pending(slot) {
-    card('wait', '', 'Ootab õpetaja luba', `<p class="name">${esc(nameOf(slot))}</p><p>See nimi on juba seotud teise telefoniga. Ütle õpetajale, et vahetasid telefoni.</p>`);
+  /* Ootel sidumine: nimi on kas teise telefoniga seotud või õpetaja poolt lukus. `back` viib tagasi nime valima;
+   * `waitGen` peatab siis vana ootamise, et see uue vaate üle ei kirjutaks. */
+  let waitGen = 0;
+  async function pending(slot, why, back) {
+    const gen = ++waitGen;
+    card('wait', '', 'Ootab õpetaja luba', `<p class="name">${esc(nameOf(slot))}</p><p>${why === 'locked' ? 'Selle nimega saab telefoni siduda ainult õpetaja loal. Pöördu õpetaja poole.' : 'See nimi on juba seotud teise telefoniga. Ütle õpetajale, et vahetasid telefoni.'}</p>${back ? '<p><button class="btn sec" id="back">Valisin vale nime</button></p>' : ''}`);
+    if (back) document.getElementById('back').onclick = () => { waitGen++; back(); };
     for (let i = 0; i < 200; i++) {
       await new Promise(r => setTimeout(r, 3000));
+      if (gen !== waitGen) return;
       let r; try { r = await KOH.rpc('koh_status', { p_session: session, p_device: device }); } catch (e) { continue; }
+      if (gen !== waitGen) return;
       if (r.status === 'ok') return ok(r);
       if (r.status === 'denied') return card('bad', '', 'Õpetaja ei lubanud', '<p>Skanni kood uuesti ja vali oma nimi.</p>');
       if (r.status === 'unknown') return failed();
@@ -105,7 +112,7 @@ footer{max-width:520px;margin:16px auto 0;font-size:13px;color:var(--muted);text
         card('', '', 'Salvestan…');
         let r; try { r = await KOH.rpc('koh_bind', { p_session: session, p_device: device, p_slot: slot }); } catch (e) { return failed(); }
         if (r.status === 'ok') return ok(r);
-        if (r.status === 'pending') return pending(slot);
+        if (r.status === 'pending') return pending(slot, r.why, () => pick(taken));
         if (r.status === 'expired') return expired();
         if (r.status === 'ended') return card('bad', '', 'Tund on lõpetatud', '<p>Kohalolekut enam ei märgita.</p>');
         failed();

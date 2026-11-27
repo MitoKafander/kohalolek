@@ -67,6 +67,7 @@ label.chk{display:inline-flex;gap:6px;align-items:center;font-size:14px;cursor:p
 .st .d{font-size:13px;color:var(--muted);text-align:right;white-space:nowrap}
 .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:5px;padding:1px 5px;margin-left:6px;background:var(--warm-soft);color:var(--warm);vertical-align:1px}
 .tag.crit{background:var(--crit-soft);color:var(--crit)}
+.tag.lock{background:var(--line);color:var(--ink)}
 .acts{display:flex;flex-wrap:wrap;gap:6px;padding:8px 4px 12px;border-bottom:1px solid var(--line)}
 .acts.cont{border-bottom:0;padding-bottom:6px}
 .acts.per{align-items:center;padding-top:0;gap:6px 12px}
@@ -100,6 +101,7 @@ table.mx{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed
 .cell:active{transform:scale(.94)}
 .txt{white-space:pre-wrap;word-break:break-word;font-size:15px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:20;background:var(--ink);color:var(--bg);border-radius:10px;padding:10px 10px 10px 14px;display:flex;gap:12px;align-items:center;max-width:calc(100% - 32px);font-size:14px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.toast[hidden]{display:none}
 .toast button{font:inherit;font-weight:700;font-size:14px;background:transparent;color:var(--bg);border:1px solid currentColor;border-radius:7px;padding:6px 10px;cursor:pointer;white-space:nowrap}
 </style>
 </head>
@@ -495,7 +497,7 @@ function statuses() {
     if (!manual && !first) st = (ended || t >= refs[0] + LATE_MS) ? 'P' : 'W';
     else st = sum(per);
     return { ...stu, st, per, pin, mark, manual, at: first ? first.at : null, late: first ? Math.max(0, Math.round((first.at - refs[0]) / 60000)) : null,
-      fresh: scans.some(x => x.fresh), missed, bound: SS.bound.includes(stu.slot) };
+      fresh: scans.some(x => x.fresh), missed, bound: SS.bound.includes(stu.slot), locked: (SS.locked || []).includes(stu.slot) };
   });
 }
 function exportTahvel() {
@@ -547,7 +549,7 @@ function vLogin() {
 function vHome() {
   const cards = G.map(g => {
     const n = g.roster.students.length;
-    return `<div class="card"><div class="grp"><div><h2>${esc(g.label)}</h2><div class="small muted">${g.roster.broken ? 'Nimekirja ei saa lugeda (vale parool?)' : `${n} õpilast · ${g.bound.length} telefoni seotud${g.last ? ` · viimati ${dmy(g.last)}` : ''}`}</div></div>
+    return `<div class="card"><div class="grp"><div><h2>${esc(g.label)}</h2><div class="small muted">${g.roster.broken ? 'Nimekirja ei saa lugeda (vale parool?)' : `${n} õpilast · ${g.bound.length} telefoni seotud${(g.locked || []).length ? ` · ${g.locked.length} ${g.locked.length === 1 ? 'nimi' : 'nime'} lukus` : ''}${g.last ? ` · viimati ${dmy(g.last)}` : ''}`}</div></div>
       <div class="row">${g.open ? `<button class="btn primary" data-act="resume" data-id="${esc(g.open)}">Jätka tundi</button>` : `<button class="btn primary" data-act="start" data-id="${esc(g.id)}"${n ? '' : ' disabled'}>Alusta tundi</button>`}
       <button class="btn" data-act="history" data-id="${esc(g.id)}">Ajalugu</button><button class="btn" data-act="edit-group" data-id="${esc(g.id)}">Muuda</button></div></div></div>`;
   }).join('');
@@ -619,7 +621,7 @@ function vSession() {
       <div class="row between"><h2>Nimekiri</h2><label class="chk"><input type="checkbox" id="hideNames"${ui.hide ? ' checked' : ''}> Peida nimed</label></div>
       <div id="claims"></div>
       <div class="list" id="list"></div>
-      <p class="small muted" style="margin:0">K = kohal, H = hilines (alla 15 min), P = puudub (15 min või rohkem, ÕKE p 9.8), osa = puudus osa tunde. Mitme tunni korral arvestatakse iga tundi eraldi. Puuduta nime, et staatust käsitsi muuta: ülemised nupud kogu ploki kohta, „Tunni kaupa“ ühe tunni kohta.</p>
+      <p class="small muted" style="margin:0">K = kohal, H = hilines (alla 15 min), P = puudub (15 min või rohkem, ÕKE p 9.8), osa = puudus osa tunde. Mitme tunni korral arvestatakse iga tundi eraldi. Puuduta nime, et staatust käsitsi muuta: ülemised nupud kogu ploki kohta, „Tunni kaupa“ ühe tunni kohta. „Lukusta nimi“: selle nimega saab telefoni siduda ainult sinu loal (nt õpilane, kes koolis ei käi); lukk kehtib ka järgmistes tundides.</p>
     </section>
   </div>`}`;
 }
@@ -638,19 +640,19 @@ function updateSession() {
   const rl = document.getElementById('roundLbl'); if (rl) rl.textContent = s.round > 1 ? ` · kontroll ${s.round}` : '';
   const nameOf = slot => (st.find(x => x.slot === slot) || {}).name || '?';
   const nr0 = metaOf().nr;
-  document.getElementById('claims').innerHTML = SS.claims.map(cl => `<div class="banner row between"><span><strong>${esc(nameOf(cl.slot))}</strong>: uus telefon tahab selle nimega siduda (${hm(cl.at)}).</span><span class="row"><button class="btn primary" data-act="claim" data-device="${esc(cl.device)}" data-ok="1">Luba</button><button class="btn" data-act="claim" data-device="${esc(cl.device)}" data-ok="0">Keela</button></span></div>`).join('');
+  document.getElementById('claims').innerHTML = SS.claims.map(cl => `<div class="banner row between"><span><strong>${esc(nameOf(cl.slot))}</strong>: ${SS.bound.includes(cl.slot) || !(SS.locked || []).includes(cl.slot) ? 'uus telefon tahab selle nimega siduda' : 'nimi on lukus, telefon tahab selle nimega siduda'} (${hm(cl.at)}).</span><span class="row"><button class="btn primary" data-act="claim" data-device="${esc(cl.device)}" data-ok="1">Luba</button><button class="btn" data-act="claim" data-device="${esc(cl.device)}" data-ok="0">Keela</button></span></div>`).join('');
   const lbl = { K: 'K', H: 'H', P: 'P', W: '·', O: 'osa' };
   document.getElementById('list').className = 'list' + (ui.hide ? ' hidden-names' : '');
   document.getElementById('list').innerHTML = st.map(x => {
     let d = x.manual ? 'käsitsi' : x.at ? (x.st === 'K' ? hm(x.at) : `${x.st === 'H' ? '' : 'saabus '}${hm(x.at)}${x.late ? ` (+${x.late} min)` : ''}`) : (x.st === 'W' ? 'ootel' : '');
     if (x.manual && x.at) d += ` · ${hm(x.at)}`;
     const strip = x.per.length > 1 && x.st !== 'K' && x.st !== 'W' ? `<span class="strip">${x.per.map((p, i) => `<span class="mini ${p}" title="${nr0 + i}. tund">${p}</span>`).join('')}</span>` : '';
-    const row = `<button class="st" data-act="open" data-slot="${esc(x.slot)}"><span class="chip ${x.st}">${lbl[x.st]}</span><span class="n">${esc(x.name)}${x.fresh && x.bound ? '<span class="tag">uus sidumine</span>' : ''}${x.missed.length ? `<span class="tag crit">puudus kontrollis ${x.missed.join(', ')}</span>` : ''}${ns.some(n => n.s === x.slot) ? `<span class="tag" style="background:var(--line);color:var(--ink)">märkeid ${ns.filter(n => n.s === x.slot).length}</span>` : ''}</span><span class="d mono">${strip}${esc(d)}</span></button>`;
+    const row = `<button class="st" data-act="open" data-slot="${esc(x.slot)}"><span class="chip ${x.st}">${lbl[x.st]}</span><span class="n">${esc(x.name)}${x.fresh && x.bound ? '<span class="tag">uus sidumine</span>' : ''}${x.locked ? '<span class="tag lock">lukus</span>' : ''}${x.missed.length ? `<span class="tag crit">puudus kontrollis ${x.missed.join(', ')}</span>` : ''}${ns.some(n => n.s === x.slot) ? `<span class="tag" style="background:var(--line);color:var(--ink)">märkeid ${ns.filter(n => n.s === x.slot).length}</span>` : ''}</span><span class="d mono">${strip}${esc(d)}</span></button>`;
     if (ui.openSlot !== x.slot) return row;
     const full = { K: 'Kohal', H: 'Hilines', P: 'Puudub' };
     /* Mitme tunni korral saab iga tundi eraldi muuta. Värviline nupp = kehtiv staatus, alumine triip = käsitsi pandud. */
     const perRow = x.per.length > 1 && SS.notes !== undefined ? `<div class="acts per"><span class="small muted">Tunni kaupa:</span>${x.per.map((p, i) => `<span class="lk"><span class="lnr">${nr0 + i}.</span>${['K', 'H', 'P'].map(v => `<button class="pb ${v}${p === v ? ' on' : ''}${x.pin[i] === v ? ' man' : ''}" data-act="per" data-slot="${esc(x.slot)}" data-nr="${nr0 + i}" data-st="${v}" aria-pressed="${p === v}" aria-label="${nr0 + i}. tund: ${full[v]}${x.pin[i] === v ? ' (käsitsi, uus vajutus võtab maha)' : ''}">${v}</button>`).join('')}</span>`).join('')}</div>` : '';
-    return row + `<div class="acts${perRow ? ' cont' : ''}">${['K', 'H', 'P'].map(v => `<button class="btn${x.mark === v && !x.pin.some(Boolean) ? ' primary' : ''}" data-act="mark" data-slot="${esc(x.slot)}" data-st="${v}">${full[v]}</button>`).join('')}<button class="btn" data-act="mark" data-slot="${esc(x.slot)}" data-st="">Automaatne</button>${x.bound ? `<button class="btn danger" data-act="unbind" data-slot="${esc(x.slot)}">Eemalda telefoni sidumine</button>` : ''}</div>${perRow}`;
+    return row + `<div class="acts${perRow ? ' cont' : ''}">${['K', 'H', 'P'].map(v => `<button class="btn${x.mark === v && !x.pin.some(Boolean) ? ' primary' : ''}" data-act="mark" data-slot="${esc(x.slot)}" data-st="${v}">${full[v]}</button>`).join('')}<button class="btn" data-act="mark" data-slot="${esc(x.slot)}" data-st="">Automaatne</button>${SS.locked ? `<button class="btn" data-act="lock" data-slot="${esc(x.slot)}" data-on="${x.locked ? 0 : 1}">${x.locked ? 'Ava nime lukk' : 'Lukusta nimi'}</button>` : ''}${x.bound ? `<button class="btn danger" data-act="unbind" data-slot="${esc(x.slot)}">Eemalda telefoni sidumine</button>` : ''}</div>${perRow}`;
   }).join('');
 }
 async function updateQr() {
@@ -761,6 +763,7 @@ document.addEventListener('click', async ev => {
     else if (a === 'open') { ui.openSlot = ui.openSlot === b.dataset.slot ? null : b.dataset.slot; updateSession(); }
     else if (a === 'per') { b.disabled = true; await setPer(b.dataset.slot, +b.dataset.nr, b.dataset.st); }
     else if (a === 'mark') { await clearPer(b.dataset.slot); await act('koh_mark', { p_session: V.id, p_slot: b.dataset.slot, p_status: b.dataset.st || null }); ui.openSlot = null; updateSession(); }
+    else if (a === 'lock') { b.disabled = true; const r = await act('koh_lock', { p_group: SS.session.group_id, p_slot: b.dataset.slot, p_on: b.dataset.on === '1' }); if (!r.ok) toast('Lukku ei saanud muuta.'); updateSession(); }
     else if (a === 'unbind') { if (!armed(b)) return; await act('koh_unbind', { p_group: SS.session.group_id, p_slot: b.dataset.slot }); ui.openSlot = null; updateSession(); }
     else if (a === 'claim') { await act('koh_claim_resolve', { p_session: V.id, p_device: b.dataset.device, p_approve: b.dataset.ok === '1' }); updateSession(); }
     else if (a === 'round') { if (!armed(b)) return; await act('koh_session_round', { p_session: V.id }); lastQrKey = ''; render(); updateQr(); }

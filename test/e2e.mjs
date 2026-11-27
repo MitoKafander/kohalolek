@@ -45,6 +45,7 @@ await T.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg
 const url = () => T.evaluate(() => window.__kohUrl);
 ok((await url()).startsWith(base + '/#'), 'QR url points at student page: ' + (await url()).length + ' chars');
 ok((await T.textContent('#count')).trim() === 'Kohal 0 / 4', 'count 0/4');
+ok(!(await T.isVisible('#toast')), 'no empty toast on screen before anything is marked');
 ok(await T.inputValue('#mN') === '3' && /^\d+$/.test(await T.inputValue('#mNr')) && (await T.textContent('#ttNote')).includes('Proovitund'), 'lesson count and start lesson prefilled from the timetable: n=' + await T.inputValue('#mN') + ' ' + (await T.textContent('#ttNote')).trim());
 await T.fill('#mN', '1'); await T.dispatchEvent('#mN', 'change');
 await T.selectOption('#mType', 'Tund'); await T.check('input[data-cap="Auditoorne õpe"]');
@@ -103,6 +104,36 @@ const bad = (await url()).replace(/#([^.]+)\.[^.]+\./, '#$1.00000000.');
 const S4 = await phone('s4'); await S4.goto(bad); await S4.waitForSelector('.card.bad');
 ok((await S4.textContent('.card.bad')).includes('aegus'), 'wrong token → expired message');
 await S4.screenshot({ path: SHOTS + '/5-student-expired.png' });
+// --- nime lukustamine: Diana on lukus → s1 (nüüd sidumata telefon) saab ta valida, aga jääb õpetaja loa ootele ---
+const diana = () => T.locator('button.st:has-text("Näidis Diana")');
+const tagIs = (name, text, on) => T.waitForFunction(([n, t, on]) => [...document.querySelectorAll('button.st')].find(b => b.textContent.includes(n)).textContent.includes(t) === on, [name, text, on], { timeout: 8000 });
+await diana().click(); await T.click('button[data-act=lock]'); await tagIs('Näidis Diana', 'lukus', true);
+await T.waitForFunction(() => document.querySelector('button[data-act=lock]').textContent.includes('Ava nime lukk'));
+ok(true, 'teacher locks a name → tag „lukus“, the button now offers to unlock');
+await S1.goto('about:blank'); await S1.goto(await url()); await S1.waitForSelector('button[data-slot]');
+ok(await S1.locator('.list > button[data-slot]:visible').count() === 2, 'locked name is still offered among the free names');
+await S1.click('button[data-slot]:has-text("Näidis Diana")'); await S1.click('#yes'); await S1.waitForSelector('.card.wait');
+ok((await S1.textContent('.card.wait')).includes('ainult õpetaja loal'), 'locked name → student is told to turn to the teacher');
+await S1.screenshot({ path: SHOTS + '/10-student-locked.png' });
+await T.waitForSelector('#claims .banner:has-text("nimi on lukus")', { timeout: 8000 });
+ok((await T.textContent('#count')).trim() === 'Kohal 2 / 4', 'locked name is not bound or checked in without the teacher');
+await T.screenshot({ path: SHOTS + '/9-teacher-locked.png' });
+// „Valisin vale nime“ → tagasi nimede juurde; vana ootamine ei kirjuta valikut üle, kui õpetaja vahepeal keelab
+await S1.click('#back'); await S1.waitForSelector('button[data-slot]');
+await T.click('#claims button[data-act=claim][data-ok="0"]');
+await T.waitForFunction(() => !document.getElementById('claims').children.length, null, { timeout: 8000 });
+await new Promise(r => setTimeout(r, 3500));
+ok(await S1.locator('.list > button[data-slot]:visible').count() === 2, 'after „Valisin vale nime“ the picker stays (the old wait is cancelled)');
+// sama nimi uuesti → õpetaja keelab → õpilane näeb keeldu
+await S1.click('button[data-slot]:has-text("Näidis Diana")'); await S1.click('#yes'); await S1.waitForSelector('.card.wait');
+await T.waitForSelector('#claims button[data-act=claim][data-ok="0"]', { timeout: 8000 }); await T.click('#claims button[data-act=claim][data-ok="0"]');
+await S1.waitForSelector('.card.bad', { timeout: 10000 });
+ok((await S1.textContent('.card.bad')).includes('ei lubanud'), 'teacher denies the locked name → student sees it');
+// lukk maha ja uuesti peale; rida jääb lõpuks kinni
+await T.click('button[data-act=lock]'); await tagIs('Näidis Diana', 'lukus', false);
+await T.click('button[data-act=lock]'); await tagIs('Näidis Diana', 'lukus', true);
+ok(true, 'lock can be removed and set again');
+await diana().click(); await T.waitForSelector('button[data-act=lock]', { state: 'detached' });
 
 // --- õpetaja: nimekiri, käsitsi parandus, uus kontroll, lõpp, eksport ---
 await T.waitForFunction(() => document.getElementById('count').textContent.trim() === 'Kohal 2 / 4', null, { timeout: 8000 });
@@ -228,7 +259,7 @@ await S1.goto('about:blank'); await S1.goto(bad); await S1.waitForSelector('.car
 ok((await S1.textContent('.card.bad')).includes('lõpetatud'), 'ended session message');
 // ajalugu + uuesti sisselogimine teises seadmes (võtmed tuletatakse paroolist)
 await T.click('button[data-act=home]'); await T.waitForSelector('button[data-act=history]');
-ok((await T.textContent('.card .small')).includes('1 telefoni seotud'), 'home shows 1 bound phone (one of two was removed above)');
+ok((await T.textContent('.card .small')).includes('1 telefoni seotud · 1 nimi lukus'), 'home shows 1 bound phone (one of two was removed above) and 1 locked name: ' + await T.textContent('.card .small'));
 await T.click('button[data-act=history]'); await T.waitForSelector('button.st[data-act=resume]');
 ok((await T.textContent('button.st[data-act=resume]')).includes('Proovija'), 'history lists the session with teacher name');
 const t2 = await browser.newContext({ viewport: { width: 1100, height: 800 } }); const T2 = await t2.newPage(); watch(T2, 'teacher2');

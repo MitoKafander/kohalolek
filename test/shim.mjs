@@ -37,7 +37,8 @@ export async function startShim({ siteDir, migration, port = 8791 }) {
       const hm = m => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
       const mon = new Date(now); mon.setDate(mon.getDate() - (mon.getDay() + 6) % 7);
       const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-      const block = { day: (now.getDay() + 6) % 7, start: hm(Math.min(nm, mins(K[k]))), end: hm(nm + 100), subject: 'Proovitund', group: 'NÄIDIS-26', hours: 3, lessons: `${k + 1}–${k + 3}` };
+      // lõpp kõige rohkem 23:59: muidu läheb plokk hilisõhtul üle südaöö ja tunniplaani vihje ei leia seda
+      const block = { day: (now.getDay() + 6) % 7, start: hm(Math.min(nm, mins(K[k]))), end: hm(Math.min(nm + 100, 1439)), subject: 'Proovitund', group: 'NÄIDIS-26', hours: 3, lessons: `${k + 1}–${k + 3}` };
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ kesklinn: { versions: [{ name: 'Test', from: iso(mon), blocks: [block], bells: [] }] }, mustamae: { versions: [] } }));
       return;

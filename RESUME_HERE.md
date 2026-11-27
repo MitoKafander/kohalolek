@@ -35,8 +35,8 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
   `~/.config/kohalolek/proov_parool.txt`. Korista enda järelt: kustuta proovitund, eemalda sidumised.
 - **Kutsekoodid:** kõik seni tehtud on kasutatud. Uus:
   `insert into kohalolek.invite (code_hash, note) values (encode(sha256(convert_to('KOOD','utf8')),'hex'), 'märkus');`
-- **Testid:** `npm test` = andmebaasi loogika (PGlite, 77), läbiv test Chrome'is (90), skript jäljendatud Tahvli
-  vormil (11). Ekraanipildid `test/shots/`.
+- **Testid:** `npm test` = andmebaasi loogika (PGlite, 77), läbiv test Chrome'is (96), skript jäljendatud Tahvli
+  vormil (12). Ekraanipildid `test/shots/`.
 - **Päris Tahvli vormi kontroll** vajab kasutaja sisselogimist. Töövõte: eraldi Chrome
   `--remote-debugging-port=9377 --user-data-dir=<ajutine>` ja `playwright-core` `connectOverCDP`. Reeglid: vormi
   ainult täida, sulge nupuga „Sulge“ (mitte „Salvesta“) ja kontrolli kannete arvu; õpilaste teksti ära tagasta
@@ -88,6 +88,10 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
   kirje `{s: koht, t: '~per', v: {tunni number: K|H|P}, at}`. Nii ei olnud vaja serverit muuta. Kehtib õpilase
   hiliseim kirje; lehel annab `events()` kõik kirjed ja `notes()` jätab need välja. Võti on tunni number (mitte
   järjekord plokis), et algustunni või tundide arvu muutmine parandust valesse tundi ei nihutaks.
+- **Uus õpilane, keda rühma nimekirjas ei ole:** Tahvli skript viib read kokku nime järgi (mitte järjekorra
+  järgi), nii et teised ei nihku; uue õpilase rida jääb puutumata ja aruanne nimetab ta real „Tahvli kandes on,
+  andmetes ei ole“. Skannides ta oma nime ei leia. Rühma võib muuta ka tunni ajal („← Rühmad“ → „Muuda“ →
+  „Jätka tundi“): olemasolevad sidumised ja lukud jäävad, sest koht leitakse nime järgi.
 - **Vahetuv kood:** 10 s aken ja sama arvutus peab klappima SQL-is (`kohalolek.token`) ja JS-is (`KOH.token`).
 - **Tööruumi nime teisendus** (`normCode`) peab olema loomisel ja sisselogimisel sama, sest nimi on võtme sool.
   Parool ei ole taastatav.

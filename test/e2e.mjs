@@ -292,6 +292,16 @@ await S5.click('button[data-slot]:has-text("Näidis Diana")'); await S5.click('#
 ok((await S5.textContent('.card.wait')).includes('ainult õpetaja loal'), 'next lesson: the locked name still needs the teacher');
 await T.waitForSelector('#claims button[data-act=claim][data-ok="0"]', { timeout: 8000 }); await T.click('#claims button[data-act=claim][data-ok="0"]');
 await T.waitForFunction(() => !document.getElementById('claims').children.length, null, { timeout: 8000 });
+// uus õpilane poole tunni pealt: rühma muutmine ei katkesta tundi ega puuduta sidumisi ja lukke
+await T.click('button[data-act=home]'); await T.waitForSelector('button[data-act=edit-group]'); await T.click('button[data-act=edit-group]');
+await T.fill('#gNames', (await T.inputValue('#gNames')).replace('Näidis Carl', 'Näidis Carl\nNäidis Cecilia')); await T.click('button[data-act=save-group]');
+await T.waitForSelector('.card button[data-act=resume]');
+ok((await T.textContent('.card .small')).includes('5 õpilast · 1 telefoni seotud · 1 nimi lukus'), 'student added to the group mid-lesson; bindings and locks kept: ' + await T.textContent('.card .small'));
+await T.click('.card button[data-act=resume]'); await T.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg'));
+ok(await T.locator('button.st:has-text("Näidis Cecilia")').count() === 1 && (await diana().textContent()).includes('lukus') && (await T.textContent('#count')).trim() === 'Kohal 0 / 5', 'the running lesson shows the new student');
+await S5.goto('about:blank'); await S5.goto(await url()); await S5.waitForSelector('button[data-slot]');
+await S5.click('button[data-slot]:has-text("Näidis Cecilia")'); await S5.click('#yes'); await S5.waitForSelector('.card.ok');
+ok((await S5.textContent('.card.ok')).includes('Näidis Cecilia'), 'the new student can pick the name and check in in the same lesson');
 // T2: rühmade leht uuesti, et näha käimasolevat tundi
 await T2.click('button[data-act=edit-group]'); await T2.click('button[data-act=home]'); await T2.waitForSelector('button[data-act=resume]'); await T2.click('button[data-act=resume]');
 await T2.waitForFunction(() => window.__kohUrl && document.querySelector('#qr svg'));

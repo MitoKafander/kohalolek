@@ -64,5 +64,20 @@ const pr = await p.evaluate(async () => {
 ok(pr.r0.praise && !pr.r0.remark && pr.r0.text === 'Aitas kaasõpilasi.' && pr.rep.praises.join() === 'Näidis Kiidetud', 'praise → text + Kiitus checkbox: ' + JSON.stringify(pr.r0));
 ok(pr.r1.remark && !pr.r1.praise && pr.r1.H && pr.r1.text.startsWith('Magas tunnis') && pr.rep.remarks.join() === 'Näidis Märkusega', 'remark → text + Märkus checkbox, attendance still set: ' + JSON.stringify(pr.r1));
 ok(!pr.r2.praise && !pr.r2.remark && pr.r2.text === '', 'student without notes untouched');
+// 8) uus õpilane Tahvli nimekirja keskel, kohaloleku andmetes teda ei ole: teised lähevad nime järgi õigesse ritta
+const mid = await p.evaluate(async () => {
+  const cb = name => `<checkbox formcontrolname="${name}"><button type="button" class="c-button"><div class="box"></div></button></checkbox>`;
+  const row = name => `<tr><td>1</td><td><div class="student-cell"><span><span>${name}</span><span>, G</span></span></div></td><td>${cb('isLessonAbsence')}</td><td><div><div class="checkbox-row">${cb('absenceLate')}${cb('absenceWithoutReason')}</div></div></td></tr>`;
+  document.getElementById('app').innerHTML = `<add-entry><table class="tahvel-table"><tbody>${row('Näidis Anna')}${row('Näidis Juurde')}${row('Näidis Peeter')}</tbody></table></add-entry>`;
+  const dialog = document.querySelector('add-entry');
+  dialog.addEventListener('click', ev => { const b = ev.target.closest('checkbox button'); if (b) b.querySelector('.box').classList.toggle('checked'); });
+  const data = window.__kohTahvel.parse(JSON.stringify({ v: 2, kind: 'kohalolek', group: 'G', students: [
+    { name: 'Näidis Peeter', status: 'P', per: ['P'], remark: null, remarkKind: null },
+    { name: 'Näidis Anna', status: 'H', per: ['H'], remark: null, remarkKind: null }] }));
+  const rep = await window.__kohTahvel.apply(dialog, data);
+  const st = i => { const tr = dialog.querySelectorAll('tbody tr')[i]; const on = n => !!tr.querySelector(`checkbox[formcontrolname="${n}"] .box.checked`); return (on('absenceLate') ? 'H' : '') + (on('absenceWithoutReason') ? 'P' : ''); };
+  return { rows: [st(0), st(1), st(2)], notInData: rep.notInData, notInTahvel: rep.notInTahvel, P: rep.P, H: rep.H };
+});
+ok(mid.rows.join('|') === 'H||P' && mid.notInData.join() === 'Näidis Juurde' && mid.notInTahvel.length === 0 && mid.P.join() === 'Näidis Peeter' && mid.H.join() === 'Näidis Anna', 'new student in the middle of the Tahvel list: others matched by name, the new row untouched and reported: ' + JSON.stringify(mid));
 console.log(`userscript DOM: ${pass} passed, ${fail} failed` + (errs.length ? ' | errors: ' + errs.join('; ') : ''));
 await b.close(); process.exit(fail || errs.length ? 1 : 0);

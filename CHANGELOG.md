@@ -1,5 +1,12 @@
 # Muudatuste ajalugu
 
+## 2026-11-28
+
+### Dokumentatsioon
+- README: uus jaotis „Kui rühma tuleb uus õpilane“ (mis juhtub, kuni teda rühma nimekirjas ei ole, ja kuidas
+  ta lisada, ka tunni ajal); seisu lause ajakohastatud.
+- RESUME_HERE: kasutaja otsust ootavad parandused on nüüd „Järgmistes sammudes“, mitte ainult komistuskivides.
+
 ## 2026-11-27
 
 ### Tunnikaupa käsitsi parandus
@@ -33,6 +40,14 @@
 **Otsused**
 - Lukus nimi jääb õpilase nimekirja nähtavale (ei peideta), nagu tellija soovis: valida saab, aga tuleb teade.
 - Õpetaja luba ei ava lukku: lukku muudab ainult õpetaja nupust.
+
+### Testid (hiljem samal päeval)
+Koodi ei muudetud: need käitumised olid olemas, nüüd on need testiga kaetud.
+- Lõpetatud tunni vaatest pandud lukk kehtib rühma järgmises tunnis (läbiv test).
+- Õpilane, kes on Tahvli kandes, aga mitte andmetes: teiste read ei nihku, tema rida jääb muutmata ja aruanne
+  nimetab ta (skripti test jäljendatud vormil; päris Tahvlis proovimata).
+- Rühma muutmine tunni ajal: uus nimi ilmub käimasolevasse tundi, sidumised ja lukud jäävad, uus õpilane saab
+  samas tunnis skannida (läbiv test).
 
 ### Leitud nõrkused (lahendamata)
 - Tundmatu brauser saab valida iga vaba nime, nii et üks telefon võib märkida mitu inimest. Lukustamine

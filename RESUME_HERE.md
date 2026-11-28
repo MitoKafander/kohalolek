@@ -62,6 +62,8 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
 
 - Päris tund: terve klass korraga, kooli Wi-Fi, iPhone'id, mitmetunnine päev algusest lõpuni.
 - „Kiitus“ linnuke ja kinnitatud tõendiga õpilane (P → V) päris Tahvlis: ainult jäljendatud vormil.
+- Õpilane, kes on Tahvli kandes, aga mitte andmetes (rida jääb muutmata, aruanne nimetab ta): ainult
+  jäljendatud vormil.
 - Vivaldi brauser (teisel õpetajal ei ilmunud nimekirjanupp; pärast 0.1.1 parandust tagasisidet pole).
 
 ## Järgmised sammud
@@ -70,10 +72,13 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
    kontrolli tulemus ja allikad on töökeskkonna mälus). Tehniliselt lahendamata sellest: õpilastele mõeldud
    teavitustekst õpilase lehel (praegu üks lause jaluses).
 1. Esimese päris tunni tagasiside ja sellest tulenevad parandused.
-2. Kasutajalt vastuseta: kas tuua siia perioodi kokkuvõte rühmajuhendajale (Tunnimärkmetes oli) ja kas teha
+2. Kasutaja otsust ootavad parandused (pakutud, vastust pole; ära alusta küsimata): iga uus sidumine õpetaja
+   loaga või nupp „Lukusta kõik vabad nimed“; nupp „Märgi mind kohal“ õpilase lehel (iPhone'i 7 päeva reegel).
+   Taust: komistuskivid „Nime valimine on nõrk koht“ ja „iPhone'i Safari“.
+3. Kasutajalt vastuseta: kas tuua siia perioodi kokkuvõte rühmajuhendajale (Tunnimärkmetes oli) ja kas teha
    tunniplaanist eeltäitmine ka teise õpetaja tundidele (praegu ainult ühe õpetaja tunniplaan).
-3. Andmebaasi võti aegub kunagi: siis palu uus samade õigustega ja lase kleepida tühja faili (`open -e`).
-4. Ideed, mida pole küsitud: asenduste arvestamine
+4. Andmebaasi võti aegub kunagi: siis palu uus samade õigustega ja lase kleepida tühja faili (`open -e`).
+5. Ideed, mida pole küsitud: asenduste arvestamine
    tunniplaanis, lisaandmete aatomne salvestus serveris, kooli Microsofti konto õpilase tuvastamiseks.
 
 ## Komistuskivid
@@ -91,7 +96,9 @@ Repo on avalik: nimesid, kooli siseasju ega saladusi siia ei kirjutata (need on 
 - **Uus õpilane, keda rühma nimekirjas ei ole:** Tahvli skript viib read kokku nime järgi (mitte järjekorra
   järgi), nii et teised ei nihku; uue õpilase rida jääb puutumata ja aruanne nimetab ta real „Tahvli kandes on,
   andmetes ei ole“. Skannides ta oma nime ei leia. Rühma võib muuta ka tunni ajal („← Rühmad“ → „Muuda“ →
-  „Jätka tundi“): olemasolevad sidumised ja lukud jäävad, sest koht leitakse nime järgi.
+  „Jätka tundi“): olemasolevad sidumised ja lukud jäävad, sest koht leitakse nime järgi. Rühma lehel peab
+  nimi klappima täht-tähelt (`s.name === name`), muidu on see uus koht; skript on leebem (`norm`, `tokens`:
+  tähesuurus ja nimeosade järjekord ei loe). Kasutajale: README „Kui rühma tuleb uus õpilane“.
 - **Vahetuv kood:** 10 s aken ja sama arvutus peab klappima SQL-is (`kohalolek.token`) ja JS-is (`KOH.token`).
 - **Tööruumi nime teisendus** (`normCode`) peab olema loomisel ja sisselogimisel sama, sest nimi on võtme sool.
   Parool ei ole taastatav.

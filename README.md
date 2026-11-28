@@ -4,7 +4,8 @@ QR-põhine kohaloleku märkimine tunnis. Õpetaja näitab ekraanil vahetuvat QR-
 selle telefoniga ja on nimekirjas kohal. Tunni lõpus saab tulemuse ühe klõpsuga Tahvli päevikukande
 vormi, kus õpetaja selle üle vaatab ja ise salvestab.
 
-**Seis 26.11.2026:** leht, server ja Tahvli skript (0.3.0) töötavad; päris tunnis veel proovimata.
+**Seis 27.11.2026:** leht, server ja Tahvli skript (0.3.0) töötavad; 27.11 lisandusid tunnikaupa käsitsi
+parandus ja nime lukustamine. Terve klassiga tunni kohta tagasisidet veel ei ole.
 Arendust jätkates loe esmalt [RESUME_HERE.md](RESUME_HERE.md); muudatused on [CHANGELOG.md](CHANGELOG.md)-s.
 
 ## Osad
@@ -37,6 +38,22 @@ Arendust jätkates loe esmalt [RESUME_HERE.md](RESUME_HERE.md); muudatused on [C
 7. „Lõpeta tund“ → „Kopeeri Tahvli jaoks“ → Tahvlis kande aknas „Kleebi kohalolek või märkused“.
    Skript täidab kande päise (liik, maht, kuupäev, algustund, tundide arv; ainult tühjad väljad) ja
    puudumised, vajadusel tunni kaupa (veerg „123?“).
+
+## Kui rühma tuleb uus õpilane
+
+Lisa ta rühma nimekirja: rühmade lehel „Muuda“ → nimi uuele reale → „Salvesta“. Seda võib teha ka tunni ajal
+(„← Rühmad“ → „Muuda“ → „Salvesta“ → „Jätka tundi“): tund jookseb edasi, teiste telefonide sidumised ja nimede
+lukud jäävad alles ning uus õpilane saab kohe skannida. Olemasolevate nimede kirjapilti samal ajal ära muuda:
+muudetud nimi loetakse uueks õpilaseks ja selle õpilase telefoni sidumine kaob.
+
+Kuni teda nimekirjas ei ole:
+
+- skannides ta oma nime ei leia (ja võib ekslikult valida kellegi teise vaba nime);
+- Tahvli skript jätab tema rea muutmata ja nimetab ta aruandes real „Tahvli kandes on, andmetes ei ole“.
+  Muutmata rida tähendab Tahvlis kohalolijat: kui ta puudus, pane P käsitsi.
+
+Teiste õpilaste read ei nihku, sest skript viib read kokku nime järgi, mitte järjekorra järgi. Suur- ja
+väiketähed ning ees- ja perekonnanime järjekord ei loe, kirjapilt peab klappima.
 
 ## Märkused ja kiitused
 
@@ -93,7 +110,8 @@ Skript loeb kahte sisendit: kohaloleku lehe „Kopeeri Tahvli jaoks“ ja Tunnim
 
 ```bash
 npm install
-npm test        # andmebaasi loogika (PGlite) + läbiv test Chrome'is, ekraanipildid test/shots/
+npm test        # andmebaasi loogika (PGlite) + läbiv test Chrome'is + Tahvli skript jäljendatud vormil;
+                # ekraanipildid test/shots/
 ```
 
 Paigaldus: migratsioonid kaustas `supabase/migrations/` käivitatakse Supabase'i halduse API kaudu (vt
